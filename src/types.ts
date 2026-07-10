@@ -220,3 +220,31 @@ export interface VisibilityConfig {
     address: boolean;
   };
 }
+
+export interface Complaint {
+  id: string;
+  name: string;
+  designation: string;
+  mobile: string;
+  email: string;
+  locationRoom: string;
+  department: string;
+  complaintDescriptionFull: string;
+  typeOfComplaint: 'IT' | 'Maintenance' | 'Admin';
+  photoDocument?: string; // Base64 or saved path
+  photoName?: string;
+  assignedStaff?: string;
+  status: 'Draft' | 'Staff Assigned' | 'Resolved' | 'Closed' | 'Pending' | 'Custom Status' | 'Dependency' | 'Staff Action Needed';
+  customStatusText?: string;
+  superUserRemark?: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Critical';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ComplaintSuperUser {
+  id: string;
+  name: string;
+  email: string;
+  department: 'IT' | 'Maintenance' | 'Admin';
+}

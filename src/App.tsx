@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Layout, Menu, Button, Card, Table, Modal, Input, Row, Col, Space, Badge, 
   Switch, Tag, Spin, Popconfirm, Avatar, Divider, message, ConfigProvider, theme, Empty,
-  App as AntdApp, Tabs, Breadcrumb, Pagination, Drawer, Grid
+  App as AntdApp, Tabs, Breadcrumb, Pagination
 } from 'antd';
 import { 
   UserOutlined, ProjectOutlined, SolutionOutlined, FilePdfOutlined, 
@@ -10,7 +10,7 @@ import {
   LogoutOutlined, LoginOutlined, SearchOutlined, PlusOutlined, EditOutlined, 
   DeleteOutlined, BulbOutlined, BulbFilled, TeamOutlined, KeyOutlined, 
   UnlockOutlined, InfoCircleOutlined, DownloadOutlined, StarOutlined, LockOutlined,
-  AppstoreOutlined, MenuOutlined, CloseOutlined, GiftOutlined
+  AppstoreOutlined, CustomerServiceOutlined
 } from '@ant-design/icons';
 import { Formik, Form, Field } from 'formik';
 import { apiService } from './services/api';
@@ -24,9 +24,67 @@ import { VisibilityPanel } from './components/VisibilityPanel';
 import { DashboardOverview } from './components/DashboardOverview';
 import { ScientistForm, ProjectForm } from './components/AdminForms';
 import { ProjectStaffForm, PermanentStaffForm, YPConsultantForm } from './components/StaffForms';
+import { ComplaintPortal } from './components/ComplaintPortal';
 
 const { Header, Content, Footer, Sider } = Layout;
-const { useBreakpoint } = Grid;
+
+export const playBroadcastNotification = () => {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      const ctx = new AudioContextClass();
+      
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      gain1.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start();
+      osc1.stop(ctx.currentTime + 0.4);
+      
+      setTimeout(() => {
+        try {
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(880, ctx.currentTime); // A5
+          gain2.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start();
+          osc2.stop(ctx.currentTime + 0.5);
+        } catch (e) {
+          console.error('Inner chime error:', e);
+        }
+      }, 120);
+    }
+  } catch (audioContextError) {
+    console.error('Web Audio not supported or blocked:', audioContextError);
+  }
+
+  try {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance("Message from Intranet");
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      
+      const voices = window.speechSynthesis.getVoices();
+      const englishVoice = voices.find(v => v.lang.startsWith('en'));
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      }
+      window.speechSynthesis.speak(utterance);
+    }
+  } catch (ttsError) {
+    console.error('SpeechSynthesis error:', ttsError);
+  }
+};
 
 interface InnerAppProps {
   themeMode: 'light' | 'dark';
@@ -35,12 +93,6 @@ interface InnerAppProps {
 
 function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const { message } = AntdApp.useApp();
-  const screens = useBreakpoint();
-  const isMobile = !screens.md;
-  const isTablet = screens.md && !screens.lg;
-
-  // Mobile menu state
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Authentication & Profile State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,12 +111,11 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const [selectedScientist, setSelectedScientist] = useState<Scientist | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // Search & Pagination states for Circulars and Forms (tabs approach)
+  // Search & Pagination states for Circulars and Forms (styled like celebrations)
   const [circularSearchText, setCircularSearchText] = useState('');
   const [circularPage, setCircularPage] = useState(1);
   const [formSearchText, setFormSearchText] = useState('');
   const [formPage, setFormPage] = useState(1);
-  const [libraryActiveTab, setLibraryActiveTab] = useState<string>('circulars');
 
   // Core Data States
   const [scientists, setScientists] = useState<Scientist[]>([]);
@@ -93,24 +144,13 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const [viewDetailType, setViewDetailType] = useState<'scientist' | 'pstaff' | 'perm' | 'ypc' | null>(null);
   const [viewDetailModalVisible, setViewDetailModalVisible] = useState(false);
 
-  // Pagination sizes based on device
-  const getPageSize = () => {
-    if (isMobile) return 5;
-    if (isTablet) return 8;
-    return 10;
-  };
-
-  const getTableScroll = () => {
-    if (isMobile) return { x: 600 };
-    if (isTablet) return { x: 800 };
-    return { x: 'max-content' };
-  };
-
   const openStaffDetailsModal = (record: any, type: 'scientist' | 'pstaff' | 'perm' | 'ypc') => {
     setViewDetailRecord(record);
     setViewDetailType(type);
     setViewDetailModalVisible(true);
   };
+
+  const lastProcessedBroadcastId = useRef<string | null>(null);
 
   // Initial Fetching
   const fetchAllData = async () => {
@@ -184,7 +224,11 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       setEvents(sortedEvents);
 
       // Sort broadcasts chronologically
-      setBroadcasts(bc.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+      const sortedBc = bc.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setBroadcasts(sortedBc);
+      if (sortedBc.length > 0 && lastProcessedBroadcastId.current === null) {
+        lastProcessedBroadcastId.current = sortedBc[0].id;
+      }
       setVisibility(vis);
 
       // If authenticated, also fetch admins list
@@ -207,7 +251,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         const admin = await apiService.getCurrentAdmin();
         setCurrentAdmin(admin);
         setIsAuthenticated(true);
-        setCurrentKey('admin-dashboard');
+        setCurrentKey('admin-dashboard'); // Redirect to admin panel
         const adminProfiles = await apiService.getAdmins();
         setAdmins(adminProfiles);
       } catch (e) {
@@ -233,6 +277,77 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     fetchAllData();
   }, []);
 
+  // Unlock browser audio restriction on first user interaction
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          const ctx = new AudioContextClass();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.0001, ctx.currentTime); // silent signal
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.1);
+        }
+      } catch (e) {
+        console.warn("Could not unlock audio context", e);
+      }
+      
+      // Remove listeners once unlocked
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+
+    return () => {
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
+  // Poll for new broadcasts every 5 seconds and play alert sound
+  useEffect(() => {
+    let intervalId: any;
+    
+    const pollBroadcasts = async () => {
+      try {
+        const bc = await apiService.getBroadcasts();
+        const sorted = bc.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        
+        if (sorted.length > 0) {
+          const newest = sorted[0];
+          
+          if (lastProcessedBroadcastId.current === null) {
+            lastProcessedBroadcastId.current = newest.id;
+          } else if (lastProcessedBroadcastId.current !== newest.id) {
+            lastProcessedBroadcastId.current = newest.id;
+            // Play notification tone and speak "Message from Intranet"
+            playBroadcastNotification();
+          }
+        }
+        setBroadcasts(sorted);
+      } catch (e) {
+        console.error("Failed to poll broadcasts", e);
+      }
+    };
+
+    // Run poll immediately on mount (or shortly after first fetchAllData)
+    const timeoutId = setTimeout(() => {
+      pollBroadcasts();
+      intervalId = setInterval(pollBroadcasts, 5000);
+    }, 2000);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
+
   const handleLogin = async () => {
     if (!loginEmail || !loginPassword || !captchaAnswer) {
       message.warning('Please input email, password and verify captcha.');
@@ -252,6 +367,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       setShowLoginModal(false);
       setCurrentKey('admin-dashboard');
       message.success(`Welcome back, ${response.admin.name}!`);
+      // Reload admin details
       const adminProfiles = await apiService.getAdmins();
       setAdmins(adminProfiles);
     } catch (error: any) {
@@ -400,6 +516,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       message.warning('This is a simulated reference statement.');
       return;
     }
+    // If it's a server uploaded path or a standard URL, open/download it directly
     if (urlOrBase64.startsWith('/uploads') || urlOrBase64.startsWith('http')) {
       window.open(urlOrBase64, '_blank');
       return;
@@ -416,173 +533,165 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   // TABLE COLUMN REPRESENTATIONS
   // ==========================================
 
-  const getScientistColumns = () => {
-    const baseColumns = [
-      { title: 'Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
-      { title: 'Scientist Name', dataIndex: 'name', key: 'name', font: 'bold', sorter: (a: any, b: any) => a.name.localeCompare(b.name) },
-      { title: 'Designation', dataIndex: 'designation', key: 'designation' },
-      { title: 'Govt Email', dataIndex: 'govtEmail', key: 'govtEmail', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
-      { title: 'Phone', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
-      { title: 'Category', dataIndex: 'category', key: 'category', render: (cat: string) => <Tag color="blue">{cat}</Tag> },
-      { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> },
-    ];
+  const getScientistColumns = () => [
+    { title: 'Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
+    { title: 'Scientist Name', dataIndex: 'name', key: 'name', font: 'bold', sorter: (a: any, b: any) => a.name.localeCompare(b.name) },
+    { title: 'Designation', dataIndex: 'designation', key: 'designation' },
+    { title: 'Govt Email', dataIndex: 'govtEmail', key: 'govtEmail', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
+    { title: 'Personal Email', dataIndex: 'personalEmail', key: 'personalEmail', render: (val: string) => renderMaskedField(val, isAuthenticated, '🔒 masked') },
+    { title: 'Phone Number', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
+    { title: 'Category', dataIndex: 'category', key: 'category', render: (cat: string) => <Tag color="blue">{cat}</Tag> },
+    { title: 'DOB', dataIndex: 'dob', key: 'dob', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.dob, '🔒 masked') },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> },
+    ...(isAuthenticated ? [{
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, rec: Scientist) => (
+        <Space size="middle">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('scientist'); }} />
+          <Popconfirm title="Delete profile?" onConfirm={() => handleDelete('scientist', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
+        </Space>
+      )
+    }] : [])
+  ];
 
-    if (isAuthenticated) {
-      baseColumns.push({
-        title: 'Actions',
-        key: 'actions',
-        render: (_: any, rec: Scientist) => (
-          <Space size="middle">
-            <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('scientist'); }} />
-            <Popconfirm title="Delete profile?" onConfirm={() => handleDelete('scientist', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
-          </Space>
-        )
-      });
-    }
-    return baseColumns;
-  };
+  const getProjectColumns = () => [
+    { title: 'Short Code', dataIndex: 'shortName', key: 'shortName', sorter: (a: any, b: any) => a.shortName.localeCompare(b.shortName) },
+    { title: 'Full Scientific Name', dataIndex: 'name', key: 'name', width: 300 },
+    { title: 'Type', dataIndex: 'type', key: 'type', render: (t: string) => <Tag color="orange">{t}</Tag> },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: (s: string) => <Tag color={s === 'Completed' ? 'green' : s === 'Ongoing' ? 'blue' : 'gray'}>{s}</Tag> },
+    { title: 'Budget', dataIndex: 'budget', key: 'budget', render: (b: number) => `₹${b.toLocaleString()}`, sorter: (a: any, b: any) => a.budget - b.budget },
+    { title: 'PI Name', dataIndex: 'piId', key: 'piId', render: (id: string) => scientists.find(s => s.id === id)?.name || 'Unknown' },
+    { title: 'Duration', dataIndex: 'durationDays', key: 'durationDays', render: (val: number) => `${val || 0} days` },
+    { title: 'Days Left', dataIndex: 'pendingDays', key: 'pendingDays', render: (val: number) => <Tag color={val === 0 ? 'red' : 'green'}>{val || 0} days</Tag> },
+    { title: 'Active Staff', dataIndex: 'staffCount', key: 'staffCount', render: (val: number) => <Badge count={val || 0} showZero className="bg-slate-400" /> },
+    {
+      title: 'Utilization Certificates',
+      key: 'uc',
+      render: (_: any, p: Project) => (
+        <Space orientation="vertical" size="small" className="text-xs">
+          {p.provisionalUCs && p.provisionalUCs.length > 0 && (
+            <div>
+              <span className="font-bold block">Prov UCs:</span>
+              {p.provisionalUCs.map((uc, i) => (
+                <Button key={uc.id || i} type="link" size="small" className="p-0 h-auto text-xs flex items-center gap-1" onClick={() => handleDownloadBase64File(uc.fileName, uc.fileData)}>
+                  <DownloadOutlined /> {uc.period}
+                </Button>
+              ))}
+            </div>
+          )}
+          {p.finalUC && (
+            <div>
+              <span className="font-bold block">Final UC:</span>
+              <Button type="link" size="small" className="p-0 h-auto text-xs flex items-center gap-1" onClick={() => handleDownloadBase64File(p.finalUC?.fileName || 'final', p.finalUC?.fileData || '')}>
+                <DownloadOutlined /> {p.finalUC.period}
+              </Button>
+            </div>
+          )}
+        </Space>
+      )
+    },
+    ...(isAuthenticated ? [{
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, rec: Project) => (
+        <Space size="middle">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('project'); }} />
+          <Popconfirm title="Delete project?" onConfirm={() => handleDelete('project', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
+        </Space>
+      )
+    }] : [])
+  ];
 
-  const getProjectColumns = () => {
-    const baseColumns = [
-      { title: 'Short Code', dataIndex: 'shortName', key: 'shortName', sorter: (a: any, b: any) => a.shortName.localeCompare(b.shortName) },
-      { title: 'Full Scientific Name', dataIndex: 'name', key: 'name', width: isMobile ? 150 : 300 },
-      { title: 'Type', dataIndex: 'type', key: 'type', render: (t: string) => <Tag color="orange">{t}</Tag> },
-      { title: 'Status', dataIndex: 'status', key: 'status', render: (s: string) => <Tag color={s === 'Completed' ? 'green' : s === 'Ongoing' ? 'blue' : 'gray'}>{s}</Tag> },
-      { title: 'Budget', dataIndex: 'budget', key: 'budget', render: (b: number) => `₹${b.toLocaleString()}`, sorter: (a: any, b: any) => a.budget - b.budget },
-      { title: 'PI Name', dataIndex: 'piId', key: 'piId', render: (id: string) => scientists.find(s => s.id === id)?.name || 'Unknown' },
-    ];
+  const getProjectStaffColumns = () => [
+    { title: 'Temp Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => (a.employeeCode || '').localeCompare(b.employeeCode || '') },
+    { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold', sorter: (a: any, b: any) => a.name.localeCompare(b.name) },
+    { title: 'Designation', dataIndex: 'designation', key: 'designation' },
+    { title: 'Linked Project', dataIndex: 'projectId', key: 'projectId', render: (id: string) => projects.find(p => p.id === id)?.shortName || 'None' },
+    { title: 'Principal Investigator', dataIndex: 'scientistId', key: 'scientistId', render: (id: string) => scientists.find(s => s.id === id)?.name || '-' },
+    { title: 'Email Address', dataIndex: 'email', key: 'email', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
+    { title: 'Phone Number', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
+    { title: 'Date of Birth', dataIndex: 'dob', key: 'dob', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.dob, '🔒 masked') },
+    { title: 'Gender', dataIndex: 'gender', key: 'gender' },
+    { title: 'Aadhaar Number', dataIndex: 'aadhaarNumber', key: 'aadhaarNumber', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.aadhaar, '🔒 masked') },
+    { title: 'PAN Card', dataIndex: 'panNumber', key: 'panNumber', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.pan, '🔒 masked') },
+    { title: 'Bank Name', dataIndex: 'bankName', key: 'bankName', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 masked') },
+    { title: 'Account Number', dataIndex: 'accountNumber', key: 'accountNumber', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 masked') },
+    { title: 'IFSC Code', dataIndex: 'ifscCode', key: 'ifscCode', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 masked') },
+    { title: 'Total Exp', dataIndex: 'totalExpMonths', key: 'totalExpMonths', render: (val: number) => <Tag color="blue">{val || 0} mos</Tag>, sorter: (a: any, b: any) => (a.totalExpMonths || 0) - (b.totalExpMonths || 0) },
+    { title: 'Category', dataIndex: 'category', key: 'category', render: (c: string) => <Tag color="purple">{c}</Tag> },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> },
+    ...(isAuthenticated ? [{
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, rec: ProjectStaff) => (
+        <Space size="middle">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('pstaff'); }} />
+          <Popconfirm title="Delete staff profile?" onConfirm={() => handleDelete('pstaff', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
+        </Space>
+      )
+    }] : [])
+  ];
 
-    if (!isMobile) {
-      baseColumns.push(
-        { title: 'Duration', dataIndex: 'durationDays', key: 'durationDays', render: (val: number) => `${val || 0} days` },
-        { title: 'Days Left', dataIndex: 'pendingDays', key: 'pendingDays', render: (val: number) => <Tag color={val === 0 ? 'red' : 'green'}>{val || 0} days</Tag> },
-        { title: 'Active Staff', dataIndex: 'staffCount', key: 'staffCount', render: (val: number) => <Badge count={val || 0} showZero className="bg-slate-400" /> }
-      );
-    }
+  const getPermanentStaffColumns = () => [
+    { title: 'Perm Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
+    { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold' },
+    { title: 'Designation', dataIndex: 'designation', key: 'designation' },
+    { title: 'Govt Email', dataIndex: 'govtEmail', key: 'govtEmail', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
+    { title: 'Phone', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
+    { title: 'Aadhaar / PAN', key: 'idDocs', render: (_: any, s: PermanentStaff) => (
+      <div className="text-[10px]">
+        <div>Aadhaar: {renderMaskedField(s.aadhaarNumber, isAuthenticated || !!visibility?.fields.aadhaar, '🔒')}</div>
+        <div>PAN: {renderMaskedField(s.panNumber, isAuthenticated || !!visibility?.fields.pan, '🔒')}</div>
+      </div>
+    )},
+    { title: 'Category', dataIndex: 'category', key: 'category', render: (c: string) => <Tag color="purple">{c}</Tag> },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> },
+    ...(isAuthenticated ? [{
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, rec: PermanentStaff) => (
+        <Space size="middle">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('perm'); }} />
+          <Popconfirm title="Delete staff profile?" onConfirm={() => handleDelete('perm', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
+        </Space>
+      )
+    }] : [])
+  ];
 
-    if (isAuthenticated) {
-      baseColumns.push({
-        title: 'Actions',
-        key: 'actions',
-        render: (_: any, rec: Project) => (
-          <Space size="middle">
-            <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('project'); }} />
-            <Popconfirm title="Delete project?" onConfirm={() => handleDelete('project', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
-          </Space>
-        )
-      });
-    }
-    return baseColumns;
-  };
-
-  const getProjectStaffColumns = () => {
-    const baseColumns = [
-      { title: 'Temp Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => (a.employeeCode || '').localeCompare(b.employeeCode || '') },
-      { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold', sorter: (a: any, b: any) => a.name.localeCompare(b.name) },
-      { title: 'Designation', dataIndex: 'designation', key: 'designation' },
-      { title: 'Linked Project', dataIndex: 'projectId', key: 'projectId', render: (id: string) => projects.find(p => p.id === id)?.shortName || 'None' },
-    ];
-
-    if (!isMobile) {
-      baseColumns.push(
-        { title: 'Email', dataIndex: 'email', key: 'email', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
-        { title: 'Phone', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
-        { title: 'Category', dataIndex: 'category', key: 'category', render: (c: string) => <Tag color="purple">{c}</Tag> },
-        { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> }
-      );
-    }
-
-    if (isAuthenticated) {
-      baseColumns.push({
-        title: 'Actions',
-        key: 'actions',
-        render: (_: any, rec: ProjectStaff) => (
-          <Space size="middle">
-            <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('pstaff'); }} />
-            <Popconfirm title="Delete staff profile?" onConfirm={() => handleDelete('pstaff', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
-          </Space>
-        )
-      });
-    }
-    return baseColumns;
-  };
-
-  const getPermanentStaffColumns = () => {
-    const baseColumns = [
-      { title: 'Perm Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
-      { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold' },
-      { title: 'Designation', dataIndex: 'designation', key: 'designation' },
-    ];
-
-    if (!isMobile) {
-      baseColumns.push(
-        { title: 'Govt Email', dataIndex: 'govtEmail', key: 'govtEmail', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
-        { title: 'Phone', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
-        { title: 'Category', dataIndex: 'category', key: 'category', render: (c: string) => <Tag color="purple">{c}</Tag> },
-        { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> }
-      );
-    }
-
-    if (isAuthenticated) {
-      baseColumns.push({
-        title: 'Actions',
-        key: 'actions',
-        render: (_: any, rec: PermanentStaff) => (
-          <Space size="middle">
-            <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('perm'); }} />
-            <Popconfirm title="Delete staff profile?" onConfirm={() => handleDelete('perm', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
-          </Space>
-        )
-      });
-    }
-    return baseColumns;
-  };
-
-  const getYPConsultantColumns = () => {
-    const baseColumns = [
-      { title: 'Temp/CONS Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
-      { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold' },
-      { title: 'Designation Type', dataIndex: 'designationType', key: 'designationType', render: (val: string) => <Tag color={val === 'Consultant' ? 'magenta' : 'cyan'}>{val}</Tag> },
-    ];
-
-    if (!isMobile) {
-      baseColumns.push(
-        { title: 'Full Designation', dataIndex: 'fullDesignation', key: 'fullDesignation' },
-        { title: 'Email', dataIndex: 'email', key: 'email', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
-        { title: 'Phone', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
-        { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> }
-      );
-    }
-
-    if (isAuthenticated) {
-      baseColumns.push({
-        title: 'Actions',
-        key: 'actions',
-        render: (_: any, rec: YPConsultant) => (
-          <Space size="middle">
-            <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('ypc'); }} />
-            <Popconfirm title="Delete profile?" onConfirm={() => handleDelete('ypc', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
-          </Space>
-        )
-      });
-    }
-    return baseColumns;
-  };
+  const getYPConsultantColumns = () => [
+    { title: 'Temp/CONS Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
+    { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold' },
+    { title: 'Designation Type', dataIndex: 'designationType', key: 'designationType', render: (val: string) => <Tag color={val === 'Consultant' ? 'magenta' : 'cyan'}>{val}</Tag> },
+    { title: 'Full Designation', dataIndex: 'fullDesignation', key: 'fullDesignation' },
+    { title: 'Email', dataIndex: 'email', key: 'email', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
+    { title: 'Phone', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> },
+    ...(isAuthenticated ? [{
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, rec: YPConsultant) => (
+        <Space size="middle">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('ypc'); }} />
+          <Popconfirm title="Delete profile?" onConfirm={() => handleDelete('ypc', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
+        </Space>
+      )
+    }] : [])
+  ];
 
   const getCircularColumns = () => [
-    { title: 'Circular Title', dataIndex: 'title', key: 'title', width: isMobile ? 150 : 450 },
+    { title: 'Circular Title', dataIndex: 'title', key: 'title', width: 450 },
     { title: 'Upload Date', dataIndex: 'uploadDate', key: 'uploadDate', sorter: (a: any, b: any) => a.uploadDate.localeCompare(b.uploadDate) },
     {
-      title: 'Document',
+      title: 'Document Source',
       key: 'document',
       render: (_: any, rec: Circular) => (
         <Button 
           type="link" 
           icon={<FilePdfOutlined />} 
           onClick={() => handleDownloadBase64File(rec.fileName, rec.fileData)}
-          size={isMobile ? "small" : "middle"}
         >
-          {!isMobile && rec.fileName}
+          {rec.fileName}
         </Button>
       )
     },
@@ -598,7 +707,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   ];
 
   const getFormColumns = () => [
-    { title: 'Form Title', dataIndex: 'title', key: 'title', width: isMobile ? 150 : 450 },
+    { title: 'Form Title', dataIndex: 'title', key: 'title', width: 450 },
     { title: 'Upload Date', dataIndex: 'uploadDate', key: 'uploadDate', sorter: (a: any, b: any) => a.uploadDate.localeCompare(b.uploadDate) },
     {
       title: 'Form File',
@@ -608,9 +717,8 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           type="link" 
           icon={<FilePdfOutlined />} 
           onClick={() => handleDownloadBase64File(rec.fileName, rec.fileData)}
-          size={isMobile ? "small" : "middle"}
         >
-          {!isMobile && rec.fileName}
+          {rec.fileName}
         </Button>
       )
     },
@@ -645,6 +753,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           <Spin size="large" description="Loading NIHR Intranet resources..." />
         </div>
       );
+    }
+
+    if (currentKey === 'complaints') {
+      return <ComplaintPortal />;
     }
 
     // A. Public Dashboard View
@@ -709,7 +821,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           label: (
             <span>
               <UserOutlined />
-              {!isMobile && ' Scientists'}
+              Scientists
             </span>
           ),
           children: (
@@ -729,10 +841,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 <Table 
                   columns={getScientistColumns()} 
                   dataSource={scientists} 
-                  pagination={{ pageSize: getPageSize() }} 
-                  size={isMobile ? "small" : "middle"} 
+                  pagination={{ pageSize: 8 }} 
+                  size="middle" 
                   rowKey="id" 
-                  scroll={getTableScroll()}
+                  scroll={{ x: 'max-content' }}
                   onRow={(record) => ({
                     onClick: (e: any) => {
                       if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
@@ -747,10 +859,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               {/* Drill Down Level 1: Projects led by selected scientist */}
               {selectedScientist && (
                 <div className="p-5 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b border-slate-100 dark:border-zinc-800 pb-2">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-zinc-800 pb-2">
                     <div>
                       <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest block">Drill-Down Level 1: Scientific Leadership</span>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200 flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
                         🔬 Projects led by Dr. {selectedScientist.name} 
                         <Tag color="blue" className="ml-1 text-[10px] uppercase font-bold">{selectedScientist.employeeCode}</Tag>
                       </h4>
@@ -773,10 +885,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       <Table
                         columns={getProjectColumns().filter(col => col.key !== 'piId')}
                         dataSource={scientistProjects}
-                        pagination={{ pageSize: getPageSize() }}
-                        size={isMobile ? "small" : "small"}
+                        pagination={{ pageSize: 5 }}
+                        size="small"
                         rowKey="id"
-                        scroll={getTableScroll()}
+                        scroll={{ x: 'max-content' }}
                         onRow={(projectRecord) => ({
                           onClick: (e: any) => {
                             if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
@@ -793,7 +905,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               {/* Drill Down Level 2: Project details & staff list */}
               {selectedScientist && selectedProject && (
                 <div className="p-5 bg-slate-50 dark:bg-zinc-900/50 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b border-slate-200 dark:border-zinc-800 pb-2">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-zinc-800 pb-2">
                     <div>
                       <span className="text-[10px] text-orange-500 font-bold uppercase tracking-widest block">Drill-Down Level 2: Administrative Details & Team Appointed</span>
                       <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
@@ -827,10 +939,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                             <Table
                               columns={getProjectStaffColumns().filter(col => col.key !== 'projectId')}
                               dataSource={associatedStaff}
-                              pagination={{ pageSize: getPageSize() }}
-                              size={isMobile ? "small" : "small"}
+                              pagination={{ pageSize: 5 }}
+                              size="small"
                               rowKey="id"
-                              scroll={getTableScroll()}
+                              scroll={{ x: 'max-content' }}
                               onRow={(staffRecord) => ({
                                 onClick: (e: any) => {
                                   if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
@@ -854,7 +966,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           label: (
             <span>
               <ProjectOutlined />
-              {!isMobile && ' Projects Ledger'}
+              Projects Ledger
             </span>
           ),
           children: (
@@ -872,10 +984,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 <Table 
                   columns={getProjectColumns()} 
                   dataSource={projects} 
-                  pagination={{ pageSize: getPageSize() }} 
-                  size={isMobile ? "small" : "middle"} 
+                  pagination={{ pageSize: 8 }} 
+                  size="middle" 
                   rowKey="id" 
-                  scroll={getTableScroll()}
+                  scroll={{ x: 'max-content' }}
                   onRow={(record) => ({
                     onClick: (e: any) => {
                       if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
@@ -889,7 +1001,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               {/* Project details and staff list drill-down */}
               {selectedProject && (
                 <div className="p-5 bg-slate-50 dark:bg-zinc-900/50 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b border-slate-200 dark:border-zinc-800 pb-2">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-zinc-800 pb-2">
                     <div>
                       <span className="text-[10px] text-orange-500 font-bold uppercase tracking-widest block">Drill-Down Project Level: Administrative Details & Team Appointed</span>
                       <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
@@ -924,10 +1036,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                             <Table
                               columns={getProjectStaffColumns().filter(col => col.key !== 'projectId')}
                               dataSource={associatedStaff}
-                              pagination={{ pageSize: getPageSize() }}
-                              size={isMobile ? "small" : "small"}
+                              pagination={{ pageSize: 5 }}
+                              size="small"
                               rowKey="id"
-                              scroll={getTableScroll()}
+                              scroll={{ x: 'max-content' }}
                               onRow={(staffRecord) => ({
                                 onClick: (e: any) => {
                                   if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
@@ -951,7 +1063,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           label: (
             <span>
               <SolutionOutlined />
-              {!isMobile && ' Project Research Staff'}
+              Project Research Staff
             </span>
           ),
           children: (
@@ -959,10 +1071,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               <Table 
                 columns={getProjectStaffColumns()} 
                 dataSource={projectStaff} 
-                pagination={{ pageSize: getPageSize() }} 
-                size={isMobile ? "small" : "middle"} 
+                pagination={{ pageSize: 8 }} 
+                size="middle" 
                 rowKey="id" 
-                scroll={{ x: isMobile ? 600 : 1200 }}
+                scroll={{ x: 1200 }}
                 onRow={(record) => ({
                   onClick: (e: any) => {
                     if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
@@ -979,7 +1091,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           label: (
             <span>
               <TeamOutlined />
-              {!isMobile && ' Permanent Staff'}
+              Permanent Staff
             </span>
           ),
           children: (
@@ -987,10 +1099,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               <Table 
                 columns={getPermanentStaffColumns()} 
                 dataSource={permanentStaff} 
-                pagination={{ pageSize: getPageSize() }} 
-                size={isMobile ? "small" : "middle"} 
+                pagination={{ pageSize: 8 }} 
+                size="middle" 
                 rowKey="id" 
-                scroll={{ x: isMobile ? 600 : 'max-content' }}
+                scroll={{ x: 'max-content' }}
                 onRow={(record) => ({
                   onClick: (e: any) => {
                     if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
@@ -1007,7 +1119,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           label: (
             <span>
               <StarOutlined />
-              {!isMobile && ' YP & Consultants'}
+              YP & Consultants
             </span>
           ),
           children: (
@@ -1015,10 +1127,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               <Table 
                 columns={getYPConsultantColumns()} 
                 dataSource={ypConsultants} 
-                pagination={{ pageSize: getPageSize() }} 
-                size={isMobile ? "small" : "middle"} 
+                pagination={{ pageSize: 8 }} 
+                size="middle" 
                 rowKey="id" 
-                scroll={{ x: isMobile ? 600 : 'max-content' }}
+                scroll={{ x: 'max-content' }}
                 onRow={(record) => ({
                   onClick: (e: any) => {
                     if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
@@ -1032,317 +1144,22 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         }] : [])
       ];
 
-      // Library Tabs with Pagination (replaces separate cards)
-      const LibraryTabs = () => {
-        const filteredCirculars = circulars.filter(c => 
-          c.title.toLowerCase().includes(circularSearchText.toLowerCase()) ||
-          (c.fileName && c.fileName.toLowerCase().includes(circularSearchText.toLowerCase()))
-        );
-        const paginatedCirculars = filteredCirculars.slice((circularPage - 1) * 5, circularPage * 5);
-
-        const filteredForms = forms.filter(f => 
-          f.title.toLowerCase().includes(formSearchText.toLowerCase()) ||
-          (f.fileName && f.fileName.toLowerCase().includes(formSearchText.toLowerCase()))
-        );
-        const paginatedForms = filteredForms.slice((formPage - 1) * 5, formPage * 5);
-
-        const libraryTabItems = [
-          {
-            key: 'circulars',
-            label: (
-              <span className="flex items-center gap-1">
-                <FilePdfOutlined className="text-red-500" />
-                Circulars ({filteredCirculars.length})
-              </span>
-            ),
-            children: (
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
-                    📄 Institutional Office Circulars
-                  </span>
-                  <Input
-                    placeholder="Search circulars..."
-                    size={isMobile ? "small" : "middle"}
-                    prefix={<SearchOutlined className="text-slate-400" />}
-                    value={circularSearchText}
-                    onChange={(e) => { setCircularSearchText(e.target.value); setCircularPage(1); }}
-                    style={{ width: isMobile ? '100%' : '220px' }}
-                    className="rounded-lg text-xs"
-                    allowClear
-                  />
-                </div>
-                
-                {paginatedCirculars.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-[300px] text-center py-12">
-                    <Empty description="No matching circulars found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {paginatedCirculars.map((item, index) => (
-                      <div key={item.id || index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3 rounded-lg gap-3 transition-all hover:bg-slate-50 dark:hover:bg-zinc-800/40 hover:shadow-sm">
-                        <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
-                          <Avatar icon={<FilePdfOutlined />} size={isMobile ? "small" : "default"} className="bg-red-50 dark:bg-red-950/40 text-red-500 flex-shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-bold text-[11px] sm:text-xs text-slate-800 dark:text-zinc-200 leading-snug line-clamp-2">{item.title}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Published: {item.uploadDate}</div>
-                          </div>
-                        </div>
-                        <Button 
-                          type="primary" 
-                          size={isMobile ? "small" : "middle"}
-                          className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border-0 rounded-md w-full sm:w-auto"
-                          icon={<DownloadOutlined />}
-                          onClick={() => handleDownloadBase64File(item.fileName, item.fileData)}
-                        >
-                          {isMobile ? 'View' : 'View Doc'}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {filteredCirculars.length > 5 && (
-                  <div className="mt-4 flex justify-center sm:justify-end border-t border-slate-100 dark:border-zinc-800 pt-3">
-                    <Pagination 
-                      size={isMobile ? "small" : "default"}
-                      current={circularPage} 
-                      total={filteredCirculars.length} 
-                      pageSize={5} 
-                      onChange={(page) => setCircularPage(page)}
-                      showSizeChanger={!isMobile}
-                      showLessItems={isMobile}
-                    />
-                  </div>
-                )}
-              </div>
-            )
-          },
-          {
-            key: 'forms',
-            label: (
-              <span className="flex items-center gap-1">
-                <SolutionOutlined className="text-purple-500" />
-                Forms ({filteredForms.length})
-              </span>
-            ),
-            children: (
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
-                    📝 Office Forms & Templates
-                  </span>
-                  <Input
-                    placeholder="Search forms..."
-                    size={isMobile ? "small" : "middle"}
-                    prefix={<SearchOutlined className="text-slate-400" />}
-                    value={formSearchText}
-                    onChange={(e) => { setFormSearchText(e.target.value); setFormPage(1); }}
-                    style={{ width: isMobile ? '100%' : '220px' }}
-                    className="rounded-lg text-xs"
-                    allowClear
-                  />
-                </div>
-                
-                {paginatedForms.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-[300px] text-center py-12">
-                    <Empty description="No matching forms found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {paginatedForms.map((item, index) => (
-                      <div key={item.id || index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3 rounded-lg gap-3 transition-all hover:bg-slate-50 dark:hover:bg-zinc-800/40 hover:shadow-sm">
-                        <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
-                          <Avatar icon={<SolutionOutlined />} size={isMobile ? "small" : "default"} className="bg-purple-50 dark:bg-purple-950/40 text-purple-500 flex-shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="font-bold text-[11px] sm:text-xs text-slate-800 dark:text-zinc-200 leading-snug line-clamp-2">{item.title}</div>
-                            <div className="text-[9px] text-slate-400 mt-0.5">Published: {item.uploadDate}</div>
-                          </div>
-                        </div>
-                        <Button 
-                          type="primary" 
-                          size={isMobile ? "small" : "middle"}
-                          className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border-0 rounded-md w-full sm:w-auto"
-                          icon={<DownloadOutlined />}
-                          onClick={() => handleDownloadBase64File(item.fileName, item.fileData)}
-                        >
-                          {isMobile ? 'Download' : 'Download'}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {filteredForms.length > 5 && (
-                  <div className="mt-4 flex justify-center sm:justify-end border-t border-slate-100 dark:border-zinc-800 pt-3">
-                    <Pagination 
-                      size={isMobile ? "small" : "default"}
-                      current={formPage} 
-                      total={filteredForms.length} 
-                      pageSize={5} 
-                      onChange={(page) => setFormPage(page)}
-                      showSizeChanger={!isMobile}
-                      showLessItems={isMobile}
-                    />
-                  </div>
-                )}
-              </div>
-            )
-          }
-        ];
-
-        return (
-          <Col xs={24} lg={8} className="flex flex-col">
-            <Card 
-              variant="outlined"
-              className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden"
-              styles={{ body: { flex: 1, padding: isMobile ? '12px' : '16px', display: 'flex', flexDirection: 'column' } }}
-            >
-              <Tabs 
-                activeKey={libraryActiveTab} 
-                onChange={(key) => {
-                  setLibraryActiveTab(key);
-                  setCircularPage(1);
-                  setFormPage(1);
-                }}
-                items={libraryTabItems}
-                className="library-tabs"
-                size={isMobile ? "small" : "middle"}
-              />
-            </Card>
-          </Col>
-        );
-      };
-
-      // Merged Events & Celebrations Card
-      const EventsAndCelebrationsCard = () => {
-        return (
-          <Col xs={24} md={12} lg={8} className="flex flex-col">
-            <Card 
-              title={<span className="text-[10px] sm:text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2"><span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full animate-pulse"></span> EVENTS & CELEBRATIONS</span>}
-              variant="outlined"
-              className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden"
-              styles={{ body: { flex: 1, overflowY: 'auto', padding: isMobile ? '12px' : '16px', maxHeight: isMobile ? '500px' : '600px' } }}
-            >
-              <div className="space-y-4 pr-1">
-                {/* Today's Events Section */}
-                {visibility?.modules.events && (
-                  <div>
-                    <div className="text-[8px] sm:text-[9px] font-bold text-blue-500 uppercase tracking-widest mb-2 border-b border-blue-100 dark:border-blue-950/40 pb-1 flex items-center gap-1.5">
-                      <span>📅 Today's Seminars & Events</span>
-                      <span className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-950 text-blue-600 rounded text-[7px] sm:text-[8px] font-bold">{events.length}</span>
-                    </div>
-                    {events.length === 0 ? (
-                      <div className="text-center py-4 text-[9px] sm:text-[10px] text-slate-400 bg-slate-50 dark:bg-zinc-900/40 rounded-lg">No events scheduled today</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {events.slice(0, isMobile ? 3 : 5).map((ev, index) => (
-                          <div key={ev.id || index} className="p-2 sm:p-3 bg-slate-50 dark:bg-zinc-800/40 rounded-lg border border-slate-100 dark:border-zinc-800 flex flex-col gap-1 transition-all hover:bg-white dark:hover:bg-zinc-850 hover:shadow-sm">
-                            <div className="flex items-center gap-2 w-full justify-between">
-                              <span className="font-extrabold text-[10px] sm:text-xs text-blue-600 dark:text-blue-400 line-clamp-1">{ev.title}</span>
-                              <Tag color="blue" className="m-0 text-[7px] sm:text-[8px] font-extrabold border-0 px-1 py-0.5">{ev.time}</Tag>
-                            </div>
-                            <div className="text-[8px] sm:text-[10px] text-slate-500 dark:text-zinc-400 flex items-center gap-1.5 flex-wrap">
-                              <span className="bg-slate-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[7px] sm:text-[8px] font-bold text-slate-600 dark:text-zinc-400">
-                                {ev.date ? new Date(ev.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <CalendarOutlined className="text-slate-400 text-[8px] sm:text-[9px]" /> <span className="font-semibold truncate">{ev.venue}</span>
-                              </span>
-                            </div>
-                            {ev.description && (
-                              <p className="text-[8px] sm:text-[10px] text-slate-400 leading-relaxed m-0 italic line-clamp-2">
-                                {ev.description}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Birthdays Section */}
-                {visibility?.modules.birthdays && (
-                  <div>
-                    <div className="text-[8px] sm:text-[9px] font-bold text-pink-500 uppercase tracking-widest mb-2 border-b border-pink-100 dark:border-pink-950/40 pb-1 flex items-center gap-1.5">
-                      <span>🎈 Active Birthdays This Week</span>
-                      <span className="px-1.5 py-0.5 bg-pink-50 dark:bg-pink-950 text-pink-600 rounded text-[7px] sm:text-[8px] font-bold">{localBirthdays.length}</span>
-                    </div>
-                    {localBirthdays.length === 0 ? (
-                      <div className="text-center py-4 text-[9px] sm:text-[10px] text-slate-400 bg-slate-50 dark:bg-zinc-900/40 rounded-lg">No birthdays this week</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {localBirthdays.slice(0, isMobile ? 3 : 5).map((item, index) => (
-                          <div key={index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-2 rounded-lg gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <Avatar icon={<UserOutlined />} size={isMobile ? "small" : "default"} className="bg-pink-50 dark:bg-pink-950/40 text-pink-600 flex-shrink-0" />
-                              <div className="min-w-0">
-                                <div className="font-bold text-[9px] sm:text-[10px] text-slate-800 dark:text-zinc-200 truncate">{item.name}</div>
-                                <div className="text-[8px] sm:text-[9px] text-slate-400 truncate">{item.designation}</div>
-                              </div>
-                            </div>
-                            <span className="text-[8px] sm:text-[9px] font-extrabold text-pink-600 flex-shrink-0">
-                              {new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Service Milestones Section */}
-                {visibility?.modules.workAnniversaries && (
-                  <div>
-                    <div className="text-[8px] sm:text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-2 border-b border-amber-100 dark:border-amber-950/40 pb-1 flex items-center gap-1.5">
-                      <span>🌟 Service Milestones</span>
-                      <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-600 rounded text-[7px] sm:text-[8px] font-bold">{localAnniversaries.length}</span>
-                    </div>
-                    {localAnniversaries.length === 0 ? (
-                      <div className="text-center py-4 text-[9px] sm:text-[10px] text-slate-400 bg-slate-50 dark:bg-zinc-900/40 rounded-lg">No milestones this week</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {localAnniversaries.slice(0, isMobile ? 3 : 5).map((item, index) => (
-                          <div key={index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-2 rounded-lg gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <Avatar icon={<StarOutlined />} size={isMobile ? "small" : "default"} className="bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex-shrink-0" />
-                              <div className="min-w-0">
-                                <div className="font-bold text-[9px] sm:text-[10px] text-slate-800 dark:text-zinc-200 truncate">{item.name}</div>
-                                <div className="text-[8px] sm:text-[9px] text-slate-400 truncate">{item.designation}</div>
-                              </div>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <Tag color="orange" className="font-extrabold border-0 text-[7px] sm:text-[8px] m-0 px-1 py-0">{item.years} Yrs</Tag>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </Card>
-          </Col>
-        );
-      };
-
       return (
         <div className="space-y-6">
           {/* 1. Latest Announcements left to right marquee */}
           {visibility?.modules.announcements && (
-            <div className="bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/40 rounded-xl p-2.5 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 overflow-hidden shadow-sm">
-              <div className="flex-shrink-0 flex items-center gap-2 bg-[#075E54] text-white px-2 sm:px-3 py-1 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider animate-pulse w-full sm:w-auto">
-                <NotificationOutlined /> Official Board
+            <div className="bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/40 rounded-xl p-2.5 flex items-center gap-3 overflow-hidden shadow-sm">
+              <div className="flex-shrink-0 flex items-center gap-2 bg-[#075E54] text-white px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider animate-pulse">
+                <NotificationOutlined /> Official Board Ticker
               </div>
-              <div className="flex-1 overflow-hidden relative w-full">
-                <div className="animate-marquee-rtl hover:[animation-play-state:paused] whitespace-nowrap inline-flex gap-8 sm:gap-12">
+              <div className="flex-1 overflow-hidden relative">
+                <div className="animate-marquee-rtl hover:[animation-play-state:paused] whitespace-nowrap inline-flex gap-12">
                   {announcements.map((ann, idx) => (
-                    <span key={ann.id || idx} className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-bold text-slate-700 dark:text-zinc-200">
-                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-emerald-500 rounded-full"></span>
+                    <span key={ann.id || idx} className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-200">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
                       {ann.title}
                       {ann.fileName && (
-                        <a href={ann.fileData} target="_blank" rel="noreferrer" className="text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-extrabold ml-1 text-[10px] sm:text-xs">
+                        <a href={ann.fileData} target="_blank" rel="noreferrer" className="text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-extrabold ml-1">
                           <FilePdfOutlined /> View Doc
                         </a>
                       )}
@@ -1356,37 +1173,295 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             </div>
           )}
 
-          {/* 2. Top-Level Layout Grid - Responsive */}
+          {/* 2. Top-Level Layout Grid (Broadcast, Today's Seminars, Birthdays/Milestones) */}
           <Row gutter={[16, 16]} className="items-stretch">
             {/* Left: WhatsApp-theme Broadcast Bulletin Channel */}
             {visibility?.modules.broadcast && (
-              <Col xs={24} lg={8} className="flex flex-col">
+              <Col xs={24} lg={12} className="flex flex-col">
                 <BroadcastFeed
                   messages={broadcasts}
                   isAdmin={false}
                   onSendMessage={async () => {}}
                   onDeleteMessage={async () => {}}
                   isWhatsAppTheme={true}
-                   onNewMessage={(newMessages) => {
-    // Update broadcasts state with new messages
-    setBroadcasts(newMessages);
-    // Optionally trigger a refresh of other data if needed
-    console.log('[App] Broadcasts updated via SSE');
-  }}
                 />
               </Col>
             )}
 
-            {/* Middle: Merged Events & Celebrations Card */}
-            <EventsAndCelebrationsCard />
+            {/* Middle: Today's Events (Scientific Events & Seminars) */}
+            {visibility?.modules.events && (
+              <Col xs={24} md={12} lg={6} className="flex flex-col">
+                <Card 
+                  title={<span className="text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2"><span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span> TODAY'S SEMINARS & EVENTS</span>}
+                  variant="outlined"
+                  className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden"
+                  styles={{ body: { flex: 1, overflowY: 'auto', padding: '16px', maxHeight: '520px' } }}
+                >
+                  {events.length === 0 ? (
+                    <Empty description="No events scheduled today" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                  ) : (
+                    <div className="space-y-4 pr-1">
+                      {events.map((ev, index) => (
+                        <div key={ev.id || index} className="p-3 bg-slate-50 dark:bg-zinc-800/40 rounded-lg border border-slate-100 dark:border-zinc-800 flex flex-col gap-1.5 transition-all hover:bg-white dark:hover:bg-zinc-850 hover:shadow-sm">
+                          <div className="flex items-center gap-2 w-full justify-between">
+                            <span className="font-extrabold text-xs text-blue-600 dark:text-blue-400 line-clamp-1">{ev.title}</span>
+                            <Tag color="blue" className="m-0 text-[8px] font-extrabold border-0 px-1 py-0.5">{ev.time}</Tag>
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-zinc-400 flex items-center gap-1.5 flex-wrap">
+                            <span className="bg-slate-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[8px] font-bold text-slate-600 dark:text-zinc-400">
+                              {ev.date ? new Date(ev.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <CalendarOutlined className="text-slate-400 text-[9px]" /> <span className="font-semibold truncate">{ev.venue}</span>
+                            </span>
+                          </div>
+                          {ev.description && (
+                            <p className="text-[10px] text-slate-400 leading-relaxed m-0 italic line-clamp-2">
+                              {ev.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </Col>
+            )}
 
-            {/* Right: Library Tabs - Circulars & Forms */}
-            {(visibility?.modules.circulars || visibility?.modules.forms) && (
-              <LibraryTabs />
+            {/* Right: Birthdays & Celebrations & Service Milestones */}
+            {(visibility?.modules.birthdays || visibility?.modules.workAnniversaries) && (
+              <Col xs={24} md={12} lg={6} className="flex flex-col">
+                <Card 
+                  title={<span className="text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2"><span className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></span> CELEBRATIONS & MILESTONES</span>}
+                  variant="outlined"
+                  className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden"
+                  styles={{ body: { flex: 1, overflowY: 'auto', padding: '16px', maxHeight: '520px' } }}
+                >
+                  <div className="space-y-4 pr-1">
+                    {/* Birthdays Section */}
+                    {visibility?.modules.birthdays && (
+                      <div>
+                        <div className="text-[9px] font-bold text-pink-500 uppercase tracking-widest mb-2 border-b border-pink-100 dark:border-pink-950/40 pb-1 flex items-center gap-1.5">
+                          <span>🎈 Active Birthdays This Week</span>
+                          <span className="px-1.5 py-0.5 bg-pink-50 dark:bg-pink-950 text-pink-600 rounded text-[8px] font-bold">{localBirthdays.length}</span>
+                        </div>
+                        {localBirthdays.length === 0 ? (
+                          <div className="text-center py-4 text-[10px] text-slate-400 bg-slate-50 dark:bg-zinc-900/40 rounded-lg">No birthdays this week</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {localBirthdays.map((item, index) => (
+                              <div key={index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-2 rounded-lg gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Avatar icon={<UserOutlined />} size="small" className="bg-pink-50 dark:bg-pink-950/40 text-pink-600 flex-shrink-0" />
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-[10px] text-slate-800 dark:text-zinc-200 truncate">{item.name}</div>
+                                    <div className="text-[9px] text-slate-400 truncate">{item.designation}</div>
+                                  </div>
+                                </div>
+                                <span className="text-[9px] font-extrabold text-pink-600 flex-shrink-0">
+                                  {new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Service Milestones Section */}
+                    {visibility?.modules.workAnniversaries && (
+                      <div>
+                        <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-2 border-b border-amber-100 dark:border-amber-950/40 pb-1 flex items-center gap-1.5">
+                          <span>🌟 Service Milestones</span>
+                          <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-600 rounded text-[8px] font-bold">{localAnniversaries.length}</span>
+                        </div>
+                        {localAnniversaries.length === 0 ? (
+                          <div className="text-center py-4 text-[10px] text-slate-400 bg-slate-50 dark:bg-zinc-900/40 rounded-lg">No milestones this week</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {localAnniversaries.map((item, index) => (
+                              <div key={index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-2 rounded-lg gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Avatar icon={<StarOutlined />} size="small" className="bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex-shrink-0" />
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-[10px] text-slate-800 dark:text-zinc-200 truncate">{item.name}</div>
+                                    <div className="text-[9px] text-slate-400 truncate">{item.designation}</div>
+                                  </div>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <Tag color="orange" className="font-extrabold border-0 text-[8px] m-0 px-1 py-0">{item.years} Yrs</Tag>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </Col>
             )}
           </Row>
 
-          {/* 3. Below Grid: Beautiful Tabbed Navigation */}
+          {/* 3. Standalone Institutional Office Circulars & Office Forms & Templates Card Row */}
+          {(visibility?.modules.circulars || visibility?.modules.forms) && (
+            (() => {
+              const filteredCirculars = circulars.filter(c => 
+                c.title.toLowerCase().includes(circularSearchText.toLowerCase()) ||
+                (c.fileName && c.fileName.toLowerCase().includes(circularSearchText.toLowerCase()))
+              );
+              const paginatedCirculars = filteredCirculars.slice((circularPage - 1) * 5, circularPage * 5);
+
+              const filteredForms = forms.filter(f => 
+                f.title.toLowerCase().includes(formSearchText.toLowerCase()) ||
+                (f.fileName && f.fileName.toLowerCase().includes(formSearchText.toLowerCase()))
+              );
+              const paginatedForms = filteredForms.slice((formPage - 1) * 5, formPage * 5);
+
+              return (
+                <Row gutter={[16, 16]} className="items-stretch">
+                  {visibility?.modules.circulars && (
+                    <Col xs={24} lg={12} className="flex flex-col">
+                      <Card 
+                        title={
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2 py-1">
+                            <span className="text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                              📄 INSTITUTIONAL OFFICE CIRCULARS
+                            </span>
+                            <Input
+                              placeholder="Search circulars..."
+                              size="small"
+                              prefix={<SearchOutlined className="text-slate-400" />}
+                              value={circularSearchText}
+                              onChange={(e) => { setCircularSearchText(e.target.value); setCircularPage(1); }}
+                              style={{ width: '180px' }}
+                              className="rounded-lg text-xs"
+                              allowClear
+                            />
+                          </div>
+                        }
+                        variant="outlined"
+                        className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden animate-fadeIn"
+                        styles={{ body: { flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' } }}
+                      >
+                        <div className="flex-1 space-y-3 min-h-[300px]">
+                          {paginatedCirculars.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                              <Empty description="No matching circulars found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                            </div>
+                          ) : (
+                            paginatedCirculars.map((item, index) => (
+                              <div key={item.id || index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3 rounded-lg gap-3 transition-all hover:bg-slate-50 dark:hover:bg-zinc-800/40 hover:shadow-sm">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <Avatar icon={<FilePdfOutlined />} size="small" className="bg-red-50 dark:bg-red-950/40 text-red-500 flex-shrink-0" />
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-[11px] text-slate-800 dark:text-zinc-200 leading-snug line-clamp-2">{item.title}</div>
+                                    <div className="text-[9px] text-slate-400 mt-0.5">Published: {item.uploadDate}</div>
+                                  </div>
+                                </div>
+                                <Button 
+                                  type="primary" 
+                                  size="small"
+                                  className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border-0 rounded-md"
+                                  icon={<DownloadOutlined />}
+                                  onClick={() => handleDownloadBase64File(item.fileName, item.fileData)}
+                                >
+                                  View Doc
+                                </Button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        {filteredCirculars.length > 5 && (
+                          <div className="mt-4 flex justify-end border-t border-slate-100 dark:border-zinc-800 pt-3">
+                            <Pagination 
+                              size="small" 
+                              current={circularPage} 
+                              total={filteredCirculars.length} 
+                              pageSize={5} 
+                              onChange={(page) => setCircularPage(page)}
+                              showSizeChanger={false}
+                            />
+                          </div>
+                        )}
+                      </Card>
+                    </Col>
+                  )}
+                  {visibility?.modules.forms && (
+                    <Col xs={24} lg={12} className="flex flex-col">
+                      <Card 
+                        title={
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2 py-1">
+                            <span className="text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2">
+                              <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                              📝 OFFICE FORMS & TEMPLATES
+                            </span>
+                            <Input
+                              placeholder="Search forms..."
+                              size="small"
+                              prefix={<SearchOutlined className="text-slate-400" />}
+                              value={formSearchText}
+                              onChange={(e) => { setFormSearchText(e.target.value); setFormPage(1); }}
+                              style={{ width: '180px' }}
+                              className="rounded-lg text-xs"
+                              allowClear
+                            />
+                          </div>
+                        }
+                        variant="outlined"
+                        className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden animate-fadeIn"
+                        styles={{ body: { flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' } }}
+                      >
+                        <div className="flex-1 space-y-3 min-h-[300px]">
+                          {paginatedForms.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                              <Empty description="No matching forms found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                            </div>
+                          ) : (
+                            paginatedForms.map((item, index) => (
+                              <div key={item.id || index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3 rounded-lg gap-3 transition-all hover:bg-slate-50 dark:hover:bg-zinc-800/40 hover:shadow-sm">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <Avatar icon={<SolutionOutlined />} size="small" className="bg-purple-50 dark:bg-purple-950/40 text-purple-500 flex-shrink-0" />
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-[11px] text-slate-800 dark:text-zinc-200 leading-snug line-clamp-2">{item.title}</div>
+                                    <div className="text-[9px] text-slate-400 mt-0.5">Published: {item.uploadDate}</div>
+                                  </div>
+                                </div>
+                                <Button 
+                                  type="primary" 
+                                  size="small"
+                                  className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border-0 rounded-md"
+                                  icon={<DownloadOutlined />}
+                                  onClick={() => handleDownloadBase64File(item.fileName, item.fileData)}
+                                >
+                                  Download
+                                </Button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        {filteredForms.length > 5 && (
+                          <div className="mt-4 flex justify-end border-t border-slate-100 dark:border-zinc-800 pt-3">
+                            <Pagination 
+                              size="small" 
+                              current={formPage} 
+                              total={filteredForms.length} 
+                              pageSize={5} 
+                              onChange={(page) => setFormPage(page)}
+                              showSizeChanger={false}
+                            />
+                          </div>
+                        )}
+                      </Card>
+                    </Col>
+                  )}
+                </Row>
+              );
+            })()
+          )}
+
+          {/* 4. Below Grid: Beautiful Tabbed Navigation */}
           <Tabs 
             activeKey={dashboardTab} 
             onChange={(key) => {
@@ -1395,8 +1470,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               setSelectedProject(null);
             }} 
             items={tabItems} 
-            className="bg-white dark:bg-zinc-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm"
-            size={isMobile ? "small" : "middle"}
+            className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm"
           />
         </div>
       );
@@ -1424,10 +1498,6 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 isAdmin={true}
                 onSendMessage={handleBroadcastMessage}
                 onDeleteMessage={(id) => handleDelete('broadcast', id)}
-                 onNewMessage={(newMessages) => {
-    // For admin, also update broadcasts when new messages arrive
-    setBroadcasts(newMessages);
-  }}
               />
             </Col>
             <Col xs={24} lg={8}>
@@ -1436,17 +1506,17 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 variant="borderless" 
                 className="shadow-sm rounded-xl"
               >
-                <div className="space-y-2 sm:space-y-3">
-                  <Button type="primary" block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('scientist'); }}>Register New Scientist</Button>
-                  <Button type="primary" block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('project'); }}>Initialize New Project</Button>
-                  <Button type="primary" block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}>Add Project Staff</Button>
-                  <Button type="primary" block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('perm'); }}>Add Permanent Staff</Button>
-                  <Button type="primary" block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}>Add YP/Consultant</Button>
+                <div className="space-y-3">
+                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('scientist'); }}>Register New Scientist</Button>
+                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('project'); }}>Initialize New Project</Button>
+                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}>Add Project Staff</Button>
+                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('perm'); }}>Add Permanent Staff</Button>
+                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}>Add YP/Consultant</Button>
                   <Divider className="my-2" />
-                  <Button block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('circular'); }}>Upload Office Circular</Button>
-                  <Button block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('form'); }}>Upload Form Template</Button>
-                  <Button block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('announcement'); }}>Add Announcement Bulletin</Button>
-                  <Button block icon={<PlusOutlined />} size={isMobile ? "small" : "middle"} onClick={() => { setEditRecord(null); setActiveModal('event'); }}>Schedule New Event</Button>
+                  <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('circular'); }}>Upload Office Circular</Button>
+                  <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('form'); }}>Upload Form Template</Button>
+                  <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('announcement'); }}>Add Announcement Bulletin</Button>
+                  <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('event'); }}>Schedule New Event</Button>
                 </div>
               </Card>
             </Col>
@@ -1512,11 +1582,11 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     } else if (currentKey === 'admin-events') {
       title = 'Today’s Scientific Events Schedules';
       columns = [
-        { title: 'Event Title', dataIndex: 'title', key: 'title', width: isMobile ? 150 : 350 },
+        { title: 'Event Title', dataIndex: 'title', key: 'title', width: 350 },
         { title: 'Date', dataIndex: 'date', key: 'date', render: (val: string) => val ? new Date(val).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Today' },
         { title: 'Venue', dataIndex: 'venue', key: 'venue' },
         { title: 'Time Slot', dataIndex: 'time', key: 'time' },
-        ...(isMobile ? [] : [{ title: 'Description', dataIndex: 'description', key: 'description' }]),
+        { title: 'Description', dataIndex: 'description', key: 'description' },
         {
           title: 'Actions',
           key: 'actions',
@@ -1560,23 +1630,21 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     return (
       <Card 
         title={
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 py-1">
-            <span className="font-bold text-sm sm:text-base text-slate-800 dark:text-zinc-100">{title}</span>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex justify-between items-center flex-wrap gap-2 py-1">
+            <span className="font-bold text-base text-slate-800 dark:text-zinc-100">{title}</span>
+            <div className="flex items-center gap-2">
               <Input
                 placeholder="Search resources..."
-                size={isMobile ? "small" : "middle"}
                 prefix={<SearchOutlined className="text-slate-400" />}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 allowClear
-                style={{ width: isMobile ? '100%' : '220px' }}
+                style={{ width: 220 }}
                 className="rounded-lg text-xs"
               />
               <Button 
                 type="primary" 
                 icon={<PlusOutlined />} 
-                size={isMobile ? "small" : "middle"}
                 className="rounded-lg text-xs font-semibold"
                 onClick={() => { setEditRecord(null); setActiveModal(modalType); }}
               >
@@ -1591,10 +1659,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         <Table 
           columns={columns} 
           dataSource={filterDataset(dataSource)} 
-          pagination={{ pageSize: getPageSize() }}
-          size={isMobile ? "small" : "middle"}
+          pagination={{ pageSize: 10 }}
+          size="middle"
           rowKey="id"
-          scroll={getTableScroll()}
+          scroll={{ x: 'max-content' }}
           onRow={(record) => {
             let rowType: 'scientist' | 'pstaff' | 'perm' | 'ypc' | null = null;
             if (currentKey === 'admin-scientists') rowType = 'scientist';
@@ -1630,150 +1698,84 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     return false;
   };
 
-  // Mobile Menu Items
-  const getMobileMenuItems = () => {
-    if (!isAuthenticated) {
-      return [
-        { key: 'public-dashboard', icon: <TeamOutlined />, label: 'Public Dashboard' }
-      ];
-    }
-
-    return [
-      { key: 'admin-dashboard', icon: <AppstoreOutlined />, label: 'Admin Dashboard' },
-      {
-        key: 'registries',
-        icon: <TeamOutlined />,
-        label: 'Registries',
-        children: [
-          { key: 'admin-scientists', icon: <UserOutlined />, label: 'Scientists' },
-          { key: 'admin-projects', icon: <ProjectOutlined />, label: 'Projects' },
-          { key: 'admin-project-staff', icon: <SolutionOutlined />, label: 'Project Staff' },
-          { key: 'admin-permanent-staff', icon: <TeamOutlined />, label: 'Permanent Staff' },
-          { key: 'admin-yp-consultants', icon: <StarOutlined />, label: 'YP & Consultants' },
-        ]
-      },
-      {
-        key: 'library',
-        icon: <FilePdfOutlined />,
-        label: 'Library',
-        children: [
-          { key: 'admin-circulars', icon: <FilePdfOutlined />, label: 'Circulars' },
-          { key: 'admin-forms', icon: <FilePdfOutlined />, label: 'Forms' },
-          { key: 'admin-events', icon: <CalendarOutlined />, label: 'Events' },
-        ]
-      },
-      { key: 'admin-visibility', icon: <SettingOutlined />, label: 'Visibility' },
-      { key: 'admin-accounts', icon: <KeyOutlined />, label: 'Accounts' },
-      { key: 'public-dashboard', icon: <TeamOutlined />, label: 'Public View' }
-    ];
-  };
-
   return (
     <Layout className="min-h-screen bg-[#F8FAFC] dark:bg-zinc-950 transition-colors duration-300">
         {/* Responsive Header */}
-        <Header className="bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 px-3 sm:px-4 md:px-6 flex justify-between items-center sticky top-0 z-50 h-12 sm:h-14">
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Mobile Menu Toggle */}
-            {isAuthenticated && isMobile && (
-              <Button
-                type="text"
-                icon={<MenuOutlined />}
-                onClick={() => setMobileMenuOpen(true)}
-                className="text-slate-600 dark:text-zinc-300"
-              />
-            )}
-
-            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-[#005EB8] rounded flex items-center justify-center overflow-hidden font-bold text-white text-[8px] sm:text-xs">
-              <img src="https://icmr.gov.in/images/icmr_logo.png" alt="Logo" className="w-full h-full object-contain p-0.5 sm:p-1" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
+        <Header className="bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 px-4 md:px-6 flex justify-between items-center sticky top-0 z-50 h-14">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-[#005EB8] rounded flex items-center justify-center overflow-hidden font-bold text-white text-xs">
+              <img src="https://icmr.gov.in/images/icmr_logo.png" alt="Logo" className="w-full h-full object-contain p-1" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
               <span className="italic">NIHR</span>
             </div>
             <div className="flex flex-col leading-none">
-              <h1 className="text-xs sm:text-sm md:text-base font-semibold tracking-tight text-[#005EB8] dark:text-blue-400 m-0">
-                Intranet <span className="hidden xs:inline text-slate-400 dark:text-zinc-500 font-normal ml-1">| Project & Staff Ledger</span>
+              <h1 className="text-sm md:text-base font-semibold tracking-tight text-[#005EB8] dark:text-blue-400 m-0">
+                Intranet <span className="hidden sm:inline text-slate-400 dark:text-zinc-500 font-normal ml-1">| Project & Staff Ledger</span>
               </h1>
             </div>
           </div>
 
-          <Space size="small" className="gap-1 sm:gap-2">
+          <Space size="middle">
             {/* Theme Toggle Button */}
             <Button 
               type="text" 
               icon={themeMode === 'dark' ? <BulbFilled className="text-yellow-500" /> : <BulbOutlined />} 
               onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
               className="text-slate-600 dark:text-zinc-300"
-              size={isMobile ? "small" : "middle"}
             />
+
+            <Button 
+              type={currentKey === 'complaints' ? 'primary' : 'default'} 
+              icon={<CustomerServiceOutlined />} 
+              className="rounded-lg text-xs font-semibold"
+              onClick={() => {
+                if (currentKey === 'complaints') {
+                  setCurrentKey(isAuthenticated ? 'admin-dashboard' : 'public-dashboard');
+                } else {
+                  setCurrentKey('complaints');
+                }
+              }}
+            >
+              {currentKey === 'complaints' ? 'Back to Intranet' : 'Complaints Desk'}
+            </Button>
 
             {/* Public/Admin Mode toggler */}
             {!isAuthenticated ? (
               <Button 
                 type="primary" 
                 icon={<LoginOutlined />} 
-                size={isMobile ? "small" : "middle"}
-                className="rounded-lg text-[10px] sm:text-xs font-semibold"
+                className="rounded-lg text-xs font-semibold"
                 onClick={() => { setShowLoginModal(true); loadCaptcha(); }}
               >
-                {isMobile ? 'Login' : 'Super Admin Login'}
+                Super Admin Login
               </Button>
             ) : (
-              <div className="flex items-center gap-1 sm:gap-2">
-                {!isMobile && (
-                  <Tag color="blue" className="m-0 border-0 text-[10px] sm:text-xs px-2 py-1 font-bold uppercase tracking-wider flex items-center gap-1">
-                    <UserOutlined /> {currentAdmin?.name}
-                  </Tag>
-                )}
+              <div className="flex items-center gap-2">
+                <Tag color="blue" className="m-0 border-0 text-xs px-2.5 py-1.5 font-bold uppercase tracking-wider flex items-center gap-1">
+                  <UserOutlined /> {currentAdmin?.name} (Admin)
+                </Tag>
                 <Button 
                   danger 
                   icon={<LogoutOutlined />} 
-                  size={isMobile ? "small" : "middle"}
-                  className="rounded-lg text-[10px] sm:text-xs font-semibold"
+                  className="rounded-lg text-xs font-semibold"
                   onClick={handleLogout}
                 >
-                  {isMobile ? 'Logout' : 'Logout'}
+                  Logout
                 </Button>
               </div>
             )}
           </Space>
         </Header>
 
-        {/* Mobile Menu Drawer */}
-        <Drawer
-          title="NIHR Intranet Menu"
-          placement="left"
-          onClose={() => setMobileMenuOpen(false)}
-          open={mobileMenuOpen}
-          width={280}
-          className="dark:bg-zinc-900"
-        >
-          <Menu
-            mode="inline"
-            selectedKeys={[currentKey]}
-            onClick={({ key }) => {
-              if (key === 'public-overview' || key === 'public-dashboard') {
-                setCurrentKey('public-dashboard');
-                setDashboardTab('scientists');
-                setSelectedScientist(null);
-                setSelectedProject(null);
-              } else {
-                setCurrentKey(key);
-              }
-              setMobileMenuOpen(false);
-            }}
-            items={getMobileMenuItems()}
-            className="border-r-0"
-          />
-        </Drawer>
-
         {/* Core Layout Grid */}
         <Layout>
           {/* Centered Main Area */}
-          <Layout className="p-2 sm:p-3 md:p-4 lg:p-6 overflow-x-hidden bg-[#F8FAFC] dark:bg-zinc-950">
+          <Layout className="p-4 md:p-6 overflow-x-hidden bg-[#F8FAFC] dark:bg-zinc-950">
             <Content className="w-full min-h-[500px]">
-              {isAuthenticated && !isMobile && (
-                <div className="mb-4 sm:mb-6 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-2 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              {isAuthenticated && (
+                <div className="mb-6 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-2 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-center gap-2 px-3">
                     <span className="w-2.5 h-2.5 bg-[#005EB8] rounded-full animate-pulse"></span>
-                    <span className="text-[10px] sm:text-xs font-extrabold text-slate-800 dark:text-zinc-200 uppercase tracking-wider">Super Admin Console</span>
+                    <span className="text-xs font-extrabold text-slate-800 dark:text-zinc-200 uppercase tracking-wider">Super Admin Console</span>
                   </div>
                   <Menu
                     mode="horizontal"
@@ -1788,17 +1790,17 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                         setCurrentKey(key);
                       }
                     }}
-                    className="border-b-0 flex-1 justify-end font-semibold text-[10px] sm:text-xs text-slate-600 dark:text-zinc-300 bg-transparent dark:bg-transparent"
+                    className="border-b-0 flex-1 justify-end font-semibold text-xs text-slate-600 dark:text-zinc-300 bg-transparent dark:bg-transparent"
                     style={{ borderBottom: 'none' }}
                     items={[
                       { key: 'admin-dashboard', icon: <AppstoreOutlined />, label: 'Admin Dashboard' },
                       {
                         key: 'registries',
                         icon: <TeamOutlined />,
-                        label: 'Registries',
+                        label: 'Administrative Registries',
                         children: [
-                          { key: 'admin-scientists', icon: <UserOutlined />, label: 'Scientists' },
-                          { key: 'admin-projects', icon: <ProjectOutlined />, label: 'Projects' },
+                          { key: 'admin-scientists', icon: <UserOutlined />, label: 'Scientists Registry' },
+                          { key: 'admin-projects', icon: <ProjectOutlined />, label: 'Projects Ledger' },
                           { key: 'admin-project-staff', icon: <SolutionOutlined />, label: 'Project Staff' },
                           { key: 'admin-permanent-staff', icon: <TeamOutlined />, label: 'Permanent Staff' },
                           { key: 'admin-yp-consultants', icon: <StarOutlined />, label: 'YP & Consultants' },
@@ -1807,92 +1809,44 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       {
                         key: 'library',
                         icon: <FilePdfOutlined />,
-                        label: 'Library',
+                        label: 'Institutional Library',
                         children: [
-                          { key: 'admin-circulars', icon: <FilePdfOutlined />, label: 'Circulars' },
-                          { key: 'admin-forms', icon: <FilePdfOutlined />, label: 'Forms' },
-                          { key: 'admin-events', icon: <CalendarOutlined />, label: 'Events' },
+                          { key: 'admin-circulars', icon: <FilePdfOutlined />, label: 'Office Circulars' },
+                          { key: 'admin-forms', icon: <FilePdfOutlined />, label: 'Office Forms Templates' },
+                          { key: 'admin-events', icon: <CalendarOutlined />, label: 'Institutional Events' },
                         ]
                       },
-                      { key: 'admin-visibility', icon: <SettingOutlined />, label: 'Visibility' },
-                      { key: 'admin-accounts', icon: <KeyOutlined />, label: 'Accounts' },
-                      { key: 'public-overview', icon: <TeamOutlined />, label: 'Public View' }
+                      { key: 'admin-visibility', icon: <SettingOutlined />, label: 'Visibility Control' },
+                      { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Grievance / Complaint Desk' },
+                      { key: 'admin-accounts', icon: <KeyOutlined />, label: 'Super Admin Accounts' },
+                      { key: 'public-overview', icon: <TeamOutlined />, label: 'View Public Dashboard' }
                     ]}
                   />
-                </div>
-              )}
-
-              {/* Show simplified admin bar on mobile */}
-              {isAuthenticated && isMobile && (
-                <div className="mb-3 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-2 rounded-xl shadow-sm">
-                  <div className="flex flex-wrap items-center gap-1">
-                    <Button 
-                      type={currentKey === 'admin-dashboard' ? 'primary' : 'text'} 
-                      size="small"
-                      onClick={() => { setCurrentKey('admin-dashboard'); setMobileMenuOpen(false); }}
-                      className="text-[10px]"
-                    >
-                      Dashboard
-                    </Button>
-                    <Button 
-                      type={currentKey.startsWith('admin-scientist') || currentKey.startsWith('admin-project') || currentKey.startsWith('admin-permanent') || currentKey.startsWith('admin-yp') ? 'primary' : 'text'} 
-                      size="small"
-                      onClick={() => setMobileMenuOpen(true)}
-                      className="text-[10px]"
-                    >
-                      Staff
-                    </Button>
-                    <Button 
-                      type={currentKey === 'admin-circulars' || currentKey === 'admin-forms' || currentKey === 'admin-events' ? 'primary' : 'text'} 
-                      size="small"
-                      onClick={() => setMobileMenuOpen(true)}
-                      className="text-[10px]"
-                    >
-                      Library
-                    </Button>
-                    <Button 
-                      type={currentKey === 'admin-visibility' ? 'primary' : 'text'} 
-                      size="small"
-                      onClick={() => { setCurrentKey('admin-visibility'); setMobileMenuOpen(false); }}
-                      className="text-[10px]"
-                    >
-                      Settings
-                    </Button>
-                    <Button 
-                      type={currentKey === 'public-dashboard' ? 'primary' : 'text'} 
-                      size="small"
-                      onClick={() => { setCurrentKey('public-dashboard'); setDashboardTab('scientists'); setSelectedScientist(null); setSelectedProject(null); }}
-                      className="text-[10px]"
-                    >
-                      Public
-                    </Button>
-                  </div>
                 </div>
               )}
               {renderContentView()}
             </Content>
             
-            <Footer className="bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800 px-3 sm:px-6 py-2 sm:py-3 flex flex-col sm:flex-row items-center justify-between text-[8px] sm:text-[10px] text-slate-400 dark:text-zinc-500 font-medium tracking-tight mt-6 sm:mt-8 rounded-lg shadow-sm">
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-4 mb-1 sm:mb-0">
+            <Footer className="bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800 px-6 py-3 flex flex-col md:flex-row items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-medium tracking-tight mt-8 rounded-lg shadow-sm">
+              <div className="flex items-center gap-4 mb-2 md:mb-0">
                 <span>System v1.4.2</span>
                 <span>Environment: Production</span>
-                <span className="hidden xs:inline">Last Sync: {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                <span>Last Data Sync: {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
               </div>
-              <div className="text-center sm:text-right">National Institute of Health Research © 2026</div>
+              <div>National Institute for Health Research © 2026</div>
             </Footer>
           </Layout>
         </Layout>
 
         {/* Login Modal with Captcha verification */}
         <Modal
-          title={<Space><LockOutlined className="text-blue-500" /><span>Super User Authentication</span></Space>}
+          title={<Space><LockOutlined className="text-blue-500" /><span>Super User Authentication Panel</span></Space>}
           open={showLoginModal}
           onOk={handleLogin}
           onCancel={() => setShowLoginModal(false)}
-          okText="Authenticate"
+          okText="Authenticate & Login"
           confirmLoading={submittingLogin}
           className="rounded-xl overflow-hidden"
-          width={isMobile ? '95%' : 520}
         >
           <div className="space-y-4 pt-2">
             <div>
@@ -1902,7 +1856,6 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 value={loginEmail} 
                 onChange={(e) => setLoginEmail(e.target.value)}
                 className="rounded-md"
-                size={isMobile ? "small" : "middle"}
               />
             </div>
             <div>
@@ -1913,23 +1866,21 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 onChange={(e) => setLoginPassword(e.target.value)}
                 onPressEnter={handleLogin}
                 className="rounded-md"
-                size={isMobile ? "small" : "middle"}
               />
             </div>
 
             {/* Math CAPTCHA verification */}
             <div className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-200 dark:border-zinc-800">
-              <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-2">🛡️ Human Verification</span>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                <span className="text-sm sm:text-base font-extrabold text-blue-700 tracking-wide select-none">{captchaQuestion}</span>
-                <Button size={isMobile ? "small" : "middle"} type="dashed" className="text-xs" onClick={loadCaptcha}>Refresh</Button>
+              <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-2">🛡️ Human Verification (Shield Engine)</span>
+              <div className="flex items-center gap-3">
+                <span className="text-base font-extrabold text-blue-700 tracking-wide select-none">{captchaQuestion}</span>
+                <Button size="small" type="dashed" className="text-xs" onClick={loadCaptcha}>Refresh CAPTCHA</Button>
               </div>
               <Input 
                 placeholder="Enter computed answer" 
                 value={captchaAnswer} 
                 onChange={(e) => setCaptchaAnswer(e.target.value)}
                 className="mt-2 rounded-md"
-                size={isMobile ? "small" : "middle"}
               />
             </div>
           </div>
@@ -1937,11 +1888,11 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
         {/* Dynamic Forms Modals */}
         <Modal
-          title={<Space><SettingOutlined /><span>{editRecord ? 'Modify Record' : 'Register New Entry'}</span></Space>}
+          title={<Space><SettingOutlined /><span>{editRecord ? 'Modify Record Details' : 'Register New Institutional Entry'}</span></Space>}
           open={activeModal !== null}
           footer={null}
           onCancel={() => { setActiveModal(null); setEditRecord(null); }}
-          width={isMobile ? '95%' : 800}
+          width={800}
           destroyOnHidden
           className="rounded-xl"
         >
@@ -2155,10 +2106,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
               <Avatar icon={<UserOutlined />} className="bg-blue-600" />
               <div>
-                <span className="font-bold text-sm sm:text-base text-slate-800 dark:text-zinc-100">
+                <span className="font-bold text-base text-slate-800 dark:text-zinc-100">
                   {viewDetailRecord?.name || 'Staff Member Profile'}
                 </span>
-                <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">
+                <span className="block text-[10px] text-slate-400 font-medium">
                   {viewDetailType === 'scientist' ? 'Scientist Registry' : 
                    viewDetailType === 'pstaff' ? 'Project Research Staff Registry' :
                    viewDetailType === 'perm' ? 'Permanent Staff Directory' :
@@ -2174,18 +2125,18 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               Close Profile View
             </Button>
           ]}
-          width={isMobile ? '95%' : 700}
+          width={700}
           className="rounded-xl overflow-hidden"
         >
           {viewDetailRecord && (
-            <div className="space-y-4 sm:space-y-6 py-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="space-y-6 py-4 max-h-[70vh] overflow-y-auto pr-1">
               {/* Profile Header Block */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-slate-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-slate-100 dark:border-zinc-800">
+              <div className="flex items-center gap-4 bg-slate-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-slate-100 dark:border-zinc-800">
                 {viewDetailRecord.photoUrl ? (
                   <img 
                     src={viewDetailRecord.photoUrl} 
                     alt={viewDetailRecord.name} 
-                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-blue-500 shadow-sm"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-blue-500 shadow-sm"
                     referrerPolicy="no-referrer"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(viewDetailRecord.name);
@@ -2193,56 +2144,56 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                   />
                 ) : (
                   <Avatar 
-                    size={isMobile ? 64 : 80} 
+                    size={80} 
                     src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(viewDetailRecord.name)}`}
                     className="border-2 border-blue-500 shadow-sm"
                   />
                 )}
-                <div className="space-y-1 w-full">
-                  <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-100 m-0">{viewDetailRecord.name}</h3>
-                  <p className="text-[10px] sm:text-xs font-semibold text-blue-600 m-0">{viewDetailRecord.designation || viewDetailRecord.fullDesignation || 'Officer'}</p>
-                  <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                    <Tag color="blue" className="m-0 text-[8px] sm:text-[10px] uppercase font-bold">{viewDetailRecord.employeeCode || 'TEMP-CODE'}</Tag>
-                    <Tag color={viewDetailRecord.status === 'Active' ? 'green' : 'red'} className="m-0 text-[8px] sm:text-[10px] uppercase font-bold">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-zinc-100 m-0">{viewDetailRecord.name}</h3>
+                  <p className="text-xs font-semibold text-blue-600 m-0">{viewDetailRecord.designation || viewDetailRecord.fullDesignation || 'Officer'}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Tag color="blue" className="m-0 text-[10px] uppercase font-bold">{viewDetailRecord.employeeCode || 'TEMP-CODE'}</Tag>
+                    <Tag color={viewDetailRecord.status === 'Active' ? 'green' : 'red'} className="m-0 text-[10px] uppercase font-bold">
                       {viewDetailRecord.status || 'Active'}
                     </Tag>
                     {viewDetailRecord.category && (
-                      <Tag color="purple" className="m-0 text-[8px] sm:text-[10px] uppercase font-bold">Category: {viewDetailRecord.category}</Tag>
+                      <Tag color="purple" className="m-0 text-[10px] uppercase font-bold">Category: {viewDetailRecord.category}</Tag>
                     )}
                   </div>
                 </div>
               </div>
 
               {/* Categorized Fields Grid */}
-              <Row gutter={[12, 12]}>
+              <Row gutter={[16, 16]}>
                 {/* Section 1: Professional & Academic */}
                 <Col xs={24}>
-                  <h4 className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
+                  <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
                     💼 Professional & Placement Details
                   </h4>
-                  <Row gutter={[8, 8]}>
+                  <Row gutter={[12, 12]}>
                     <Col xs={12} sm={8}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Date of Joining</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Date of Joining</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {viewDetailRecord.doj || 'Not Registered'}
                       </span>
                     </Col>
                     <Col xs={12} sm={8}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Room Number</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Room Number</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {viewDetailRecord.roomNumber || 'Not Assigned'}
                       </span>
                     </Col>
                     <Col xs={12} sm={8}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Department Location</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Department Location</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {viewDetailRecord.departmentLocation || 'Main Campus Block'}
                       </span>
                     </Col>
                     {viewDetailRecord.projectId && (
                       <Col xs={24} sm={12}>
-                        <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Linked Research Project</span>
-                        <span className="text-[10px] sm:text-xs font-semibold text-blue-600">
+                        <span className="block text-[10px] text-slate-400 font-medium">Linked Research Project</span>
+                        <span className="text-xs font-semibold text-blue-600">
                           {projects.find(p => p.id === viewDetailRecord.projectId)?.name || 'Research Scheme'}
                         </span>
                       </Col>
@@ -2252,33 +2203,33 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
                 {/* Section 2: Contact Details */}
                 <Col xs={24}>
-                  <h4 className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
+                  <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
                     ✉️ Contact & Communications
                   </h4>
-                  <Row gutter={[8, 8]}>
+                  <Row gutter={[12, 12]}>
                     <Col xs={24} sm={12}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Primary Email</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Primary Email</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {renderMaskedField(viewDetailRecord.govtEmail || viewDetailRecord.email, isAuthenticated || !!visibility?.fields.email)}
                       </span>
                     </Col>
                     {viewDetailRecord.personalEmail && (
                       <Col xs={24} sm={12}>
-                        <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Personal Email</span>
-                        <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                        <span className="block text-[10px] text-slate-400 font-medium">Personal Email</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                           {renderMaskedField(viewDetailRecord.personalEmail, isAuthenticated)}
                         </span>
                       </Col>
                     )}
                     <Col xs={12} sm={12}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Phone / Mobile</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Phone / Mobile</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {renderMaskedField(viewDetailRecord.phone, isAuthenticated || !!visibility?.fields.phone)}
                       </span>
                     </Col>
                     <Col xs={12} sm={12}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Emergency Contact</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Emergency Contact</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {renderMaskedField(viewDetailRecord.emergencyContact, isAuthenticated || !!visibility?.fields.phone, '🔒 Masked')}
                       </span>
                     </Col>
@@ -2287,43 +2238,43 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
                 {/* Section 3: Personal & Identification Verification */}
                 <Col xs={24}>
-                  <h4 className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
+                  <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
                     👤 Personal Identity & Security IDs
                   </h4>
-                  <Row gutter={[8, 8]}>
+                  <Row gutter={[12, 12]}>
                     <Col xs={12} sm={8}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Date of Birth</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Date of Birth</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {renderMaskedField(viewDetailRecord.dob, isAuthenticated || !!visibility?.fields.dob)}
                       </span>
                     </Col>
                     <Col xs={12} sm={8}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Gender</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Gender</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {viewDetailRecord.gender || '-'}
                       </span>
                     </Col>
                     <Col xs={12} sm={8}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Blood Group</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Blood Group</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {viewDetailRecord.bloodGroup || '-'}
                       </span>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Aadhaar Card Number</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Aadhaar Card Number</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {renderMaskedField(viewDetailRecord.aadhaarNumber, isAuthenticated || !!visibility?.fields.aadhaar, '🔒 Restricted Masked')}
                       </span>
                     </Col>
                     <Col xs={24} sm={12}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Permanent Account Number (PAN)</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Permanent Account Number (PAN)</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {renderMaskedField(viewDetailRecord.panNumber, isAuthenticated || !!visibility?.fields.pan, '🔒 Restricted Masked')}
                       </span>
                     </Col>
                     <Col xs={24}>
-                      <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Residential Home Address</span>
-                      <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                      <span className="block text-[10px] text-slate-400 font-medium">Residential Home Address</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                         {renderMaskedField(viewDetailRecord.address, isAuthenticated || !!visibility?.fields.address, '🔒 Restricted Masked')}
                       </span>
                     </Col>
@@ -2333,25 +2284,25 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 {/* Section 4: Bank Details */}
                 {viewDetailRecord.accountNumber && (
                   <Col xs={24}>
-                    <h4 className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
+                    <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
                       🏦 Official Salary Disbursement Bank Account
                     </h4>
-                    <Row gutter={[8, 8]}>
+                    <Row gutter={[12, 12]}>
                       <Col xs={24} sm={8}>
-                        <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Bank Name</span>
-                        <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                        <span className="block text-[10px] text-slate-400 font-medium">Bank Name</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                           {renderMaskedField(viewDetailRecord.bankName, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 Restricted Masked')}
                         </span>
                       </Col>
                       <Col xs={24} sm={8}>
-                        <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">Account Number</span>
-                        <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                        <span className="block text-[10px] text-slate-400 font-medium">Account Number</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                           {renderMaskedField(viewDetailRecord.accountNumber, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 Restricted Masked')}
                         </span>
                       </Col>
                       <Col xs={24} sm={8}>
-                        <span className="block text-[8px] sm:text-[10px] text-slate-400 font-medium">IFSC Routing Code</span>
-                        <span className="text-[10px] sm:text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                        <span className="block text-[10px] text-slate-400 font-medium">IFSC Routing Code</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
                           {renderMaskedField(viewDetailRecord.ifscCode, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 Restricted Masked')}
                         </span>
                       </Col>
@@ -2362,58 +2313,58 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 {/* Section 5: Experience Entries (For Project Staff) */}
                 {viewDetailType === 'pstaff' && (
                   <Col xs={24}>
-                    <h4 className="text-[10px] sm:text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
+                    <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
                       🎓 Historical Service Experience Records
                     </h4>
-                    <div className="bg-blue-50/50 dark:bg-blue-950/20 p-2 sm:p-3 rounded-lg border border-blue-100/50 dark:border-blue-900/30 mb-3 text-[10px] sm:text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-2">
+                    <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-100/50 dark:border-blue-900/30 mb-3 text-xs flex justify-between items-center">
                       <span className="font-semibold text-blue-800 dark:text-blue-300">Cumulative Experience Month Totals:</span>
                       <span className="font-bold text-blue-600 dark:text-blue-400">
                         {viewDetailRecord.totalExpMonths || 0} Months (ICMR: {viewDetailRecord.icmrExpMonths || 0} | Non-ICMR: {viewDetailRecord.nonIcmrExpMonths || 0})
                       </span>
                     </div>
 
-                    <div className="space-y-3 sm:space-y-4">
+                    <div className="space-y-4">
                       {/* Previous ICMR Experience */}
                       <div>
-                        <span className="block text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase mb-1.5">ICMR Experience</span>
+                        <span className="block text-[10px] text-slate-400 font-bold uppercase mb-1.5">ICMR Experience</span>
                         {viewDetailRecord.previousIcmrExperience && viewDetailRecord.previousIcmrExperience.length > 0 ? (
                           <div className="space-y-2">
                             {viewDetailRecord.previousIcmrExperience.map((exp: any, i: number) => (
-                              <div key={exp.id || i} className="bg-slate-50/75 dark:bg-zinc-900/30 p-2 sm:p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-[10px] sm:text-xs">
-                                <div className="flex flex-col sm:flex-row justify-between font-bold text-slate-700 dark:text-zinc-300">
+                              <div key={exp.id || i} className="bg-slate-50/75 dark:bg-zinc-900/30 p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-xs">
+                                <div className="flex justify-between font-bold text-slate-700 dark:text-zinc-300">
                                   <span>{exp.instituteName}</span>
                                   <span className="text-blue-600">{exp.designation}</span>
                                 </div>
-                                <div className="text-[8px] sm:text-[10px] text-slate-400 mt-1">
+                                <div className="text-[10px] text-slate-400 mt-1">
                                   From: {exp.fromDate || '-'} To: {exp.toDate || '-'}
                                 </div>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-[10px] sm:text-xs italic text-slate-400 block pl-1">No previous ICMR service logged.</span>
+                          <span className="text-xs italic text-slate-400 block pl-1">No previous ICMR service logged.</span>
                         )}
                       </div>
 
                       {/* Previous Non-ICMR Experience */}
                       <div>
-                        <span className="block text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase mb-1.5">Non-ICMR Experience</span>
+                        <span className="block text-[10px] text-slate-400 font-bold uppercase mb-1.5">Non-ICMR Experience</span>
                         {viewDetailRecord.previousNonIcmrExperience && viewDetailRecord.previousNonIcmrExperience.length > 0 ? (
                           <div className="space-y-2">
                             {viewDetailRecord.previousNonIcmrExperience.map((exp: any, i: number) => (
-                              <div key={exp.id || i} className="bg-slate-50/75 dark:bg-zinc-900/30 p-2 sm:p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-[10px] sm:text-xs">
-                                <div className="flex flex-col sm:flex-row justify-between font-bold text-slate-700 dark:text-zinc-300">
+                              <div key={exp.id || i} className="bg-slate-50/75 dark:bg-zinc-900/30 p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-xs">
+                                <div className="flex justify-between font-bold text-slate-700 dark:text-zinc-300">
                                   <span>{exp.instituteName}</span>
                                   <span className="text-blue-600">{exp.designation}</span>
                                 </div>
-                                <div className="text-[8px] sm:text-[10px] text-slate-400 mt-1">
+                                <div className="text-[10px] text-slate-400 mt-1">
                                   From: {exp.fromDate || '-'} To: {exp.toDate || '-'}
                                 </div>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-[10px] sm:text-xs italic text-slate-400 block pl-1">No previous non-ICMR service logged.</span>
+                          <span className="text-xs italic text-slate-400 block pl-1">No previous non-ICMR service logged.</span>
                         )}
                       </div>
                     </div>
@@ -2422,26 +2373,26 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
                 {/* Section 6: Leave Clearance Information */}
                 {viewDetailRecord.status === 'Left' && (
-                  <Col xs={24} className="bg-red-50/50 dark:bg-red-950/10 p-3 sm:p-4 rounded-xl border border-red-100 dark:border-red-900/30">
-                    <h4 className="text-[10px] sm:text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider mb-2">
+                  <Col xs={24} className="bg-red-50/50 dark:bg-red-950/10 p-4 rounded-xl border border-red-100 dark:border-red-900/30">
+                    <h4 className="text-xs font-bold text-red-800 dark:text-red-300 uppercase tracking-wider mb-2">
                       ⚠️ Separation & Exit Clearance Guidelines
                     </h4>
-                    <Row gutter={[8, 8]}>
+                    <Row gutter={[12, 12]}>
                       <Col xs={12}>
-                        <span className="block text-[8px] sm:text-[10px] text-red-500 font-medium">Last Working Date</span>
-                        <span className="text-[10px] sm:text-xs font-bold text-slate-800 dark:text-zinc-200">
+                        <span className="block text-[10px] text-red-500 font-medium">Last Working Date</span>
+                        <span className="text-xs font-bold text-slate-800 dark:text-zinc-200">
                           {viewDetailRecord.lastWorkingDate || '-'}
                         </span>
                       </Col>
                       <Col xs={12}>
-                        <span className="block text-[8px] sm:text-[10px] text-red-500 font-medium">No Dues Certificate Status</span>
-                        <Tag color={viewDetailRecord.noDuesCleared ? 'green' : 'orange'} className="text-[8px] sm:text-[10px]">
-                          {viewDetailRecord.noDuesCleared ? '✔️ CLEARED' : '❌ PENDING'}
+                        <span className="block text-[10px] text-red-500 font-medium">No Dues Certificate Status</span>
+                        <Tag color={viewDetailRecord.noDuesCleared ? 'green' : 'orange'}>
+                          {viewDetailRecord.noDuesCleared ? '✔️ CLEARED & ARCHIVED' : '❌ PENDING SUBMISSION'}
                         </Tag>
                       </Col>
                       <Col xs={24}>
-                        <span className="block text-[8px] sm:text-[10px] text-red-500 font-medium">Leaving Reason</span>
-                        <span className="text-[10px] sm:text-xs font-medium text-slate-700 dark:text-zinc-300">
+                        <span className="block text-[10px] text-red-500 font-medium">Leaving Reason</span>
+                        <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">
                           {viewDetailRecord.leavingReason || 'Not stated'}
                         </span>
                       </Col>
@@ -2464,7 +2415,7 @@ export default function App() {
       theme={{
         algorithm: themeMode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#005EB8',
+          colorPrimary: '#005EB8', // Premium Clean Minimalism Royal Blue
           borderRadius: 8,
           fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
         },

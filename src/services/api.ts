@@ -249,4 +249,41 @@ export const apiService = {
     const res = await client.put<{ success: boolean; visibility: VisibilityConfig }>('/visibility', data);
     return res.data.visibility;
   },
+
+  // Complaints / Task tracking Portal API
+  loginComplaintSuperUser: async (data: any) => {
+    const res = await client.post<{ token: string; superUser: any }>('/complaints/auth/login', data);
+    // Save separate token for complaint superuser
+    localStorage.setItem('complaint_su_token', res.data.token);
+    return res.data;
+  },
+  logoutComplaintSuperUser: () => {
+    localStorage.removeItem('complaint_su_token');
+  },
+  raiseComplaint: async (data: any) => {
+    const res = await client.post('/complaints', data);
+    return res.data;
+  },
+  searchComplaintsByMobile: async (mobile: string) => {
+    const res = await client.get(`/complaints/search?mobile=${encodeURIComponent(mobile)}`);
+    return res.data;
+  },
+  getComplaints: async () => {
+    const token = localStorage.getItem('complaint_su_token');
+    const res = await client.get('/complaints', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    return res.data;
+  },
+  updateComplaint: async (id: string, data: any) => {
+    const token = localStorage.getItem('complaint_su_token');
+    const res = await client.put(`/complaints/${id}`, data, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    return res.data;
+  }
 };

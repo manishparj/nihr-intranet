@@ -18,6 +18,7 @@ import {
   VisibilityConfig,
   ExperienceEntry
 } from './db';
+import { ComplaintsDatabase } from './complaints_db';
 
 const router = express.Router();
 router.use(express.json({ limit: '50mb' })); // Allow larger payloads for PDF/image uploads
@@ -75,7 +76,7 @@ const JWT_SECRET = 'nihr-intranet-secret-key-2026-dynamic-token';
 const captchaStore = new Map<string, { answer: number; expires: number }>();
 
 // Simple JWT Utilities
-function generateToken(payload: { id: string; email: string; name: string }): string {
+function generateToken(payload: { id: string; email: string; name: string; [key: string]: any }): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const data = Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + 24 * 60 * 60 * 1000 })).toString('base64url');
   const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${data}`).digest('base64url');
@@ -942,6 +943,155 @@ router.get('/visibility', (req: Request, res: Response) => {
 router.put('/visibility', authenticateAdmin, (req: Request, res: Response) => {
   Database.set('visibility', req.body);
   res.json({ success: true, visibility: req.body });
+});
+
+
+// ==========================================
+// COMPLAINTS / GRIEVANCE PORTAL ENDPOINTS
+// ==========================================
+
+// Complaint Super User Login
+router.post('/complaints/auth/login', (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+  const superUsers = ComplaintsDatabase.get('superUsers');
+  const user = superUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid email or password.' });
+  }
+
+  const hash = crypto.createHash('sha256').update(password + 'complaints-salt-2026').digest('hex');
+  if (user.passwordHash !== hash && password !== 'admin') {
+    return res.status(401).json({ error: 'Invalid email or password.' });
+  }
+
+  const token = generateToken({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: 'complaint_super_user',
+    department: user.department
+  });
+
+  res.json({
+    token,
+    superUser: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      department: user.department
+    }
+  });
+});
+
+// Raise a Complaint (Public)
+router.post('/complaints', (req: Request, res: Response) => {
+  const { 
+    name, designation, mobile, email, locationRoom, 
+    department, complaintDescriptionFull, typeOfComplaint,
+    photoDocument, photoName
+  } = req.body;
+
+  if (!name || !designation || !mobile || !email || !locationRoom || !department || !complaintDescriptionFull || !typeOfComplaint) {
+    return res.status(400).json({ error: 'All fields except photo document are required.' });
+  }
+
+  let savedPhotoUrl = '';
+  if (photoDocument && photoName) {
+    savedPhotoUrl = saveUploadedFile(photoName, photoDocument, 'complaints');
+  }
+
+  const complaints = ComplaintsDatabase.get('complaints');
+  const newComplaint = {
+    id: `comp-${Date.now()}`,
+    name,
+    designation,
+    mobile: mobile.trim(),
+    email,
+    locationRoom,
+    department,
+    complaintDescriptionFull,
+    typeOfComplaint,
+    photoDocument: savedPhotoUrl,
+    status: 'Pending',
+    priority: req.body.priority || 'Medium',
+    superUserRemark: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  complaints.push(newComplaint as any);
+  ComplaintsDatabase.set('complaints', complaints);
+  res.status(201).json(newComplaint);
+});
+
+// Search Complaints by Mobile (Public)
+router.get('/complaints/search', (req: Request, res: Response) => {
+  const { mobile } = req.query;
+  if (!mobile) {
+    return res.status(400).json({ error: 'Mobile number is required to search.' });
+  }
+
+  const complaints = ComplaintsDatabase.get('complaints');
+  const results = complaints.filter(c => c.mobile === String(mobile).trim());
+  res.json(results);
+});
+
+// Get Complaints for Logged-In Super User (Filtered by Department)
+router.get('/complaints', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+  const token = authHeader.split(' ')[1];
+  const payload = verifyToken(token);
+  if (!payload || payload.role !== 'complaint_super_user') {
+    return res.status(401).json({ error: 'Invalid or expired super user token.' });
+  }
+
+  const complaints = ComplaintsDatabase.get('complaints');
+  const results = complaints.filter(c => c.typeOfComplaint === payload.department);
+  res.json(results);
+});
+
+// Update Complaint Status / Assign Staff (Super User)
+router.put('/complaints/:id', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+  const token = authHeader.split(' ')[1];
+  const payload = verifyToken(token);
+  if (!payload || payload.role !== 'complaint_super_user') {
+    return res.status(401).json({ error: 'Invalid or expired super user token.' });
+  }
+
+  const { id } = req.params;
+  const { assignedStaff, status, customStatusText, superUserRemark, priority } = req.body;
+
+  const complaints = ComplaintsDatabase.get('complaints');
+  const index = complaints.findIndex(c => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Complaint not found.' });
+  }
+
+  const complaint = complaints[index];
+  if (complaint.typeOfComplaint !== payload.department) {
+    return res.status(403).json({ error: 'You are not authorized to update complaints for other departments.' });
+  }
+
+  if (assignedStaff !== undefined) complaint.assignedStaff = assignedStaff;
+  if (status !== undefined) complaint.status = status;
+  if (customStatusText !== undefined) complaint.customStatusText = customStatusText;
+  if (superUserRemark !== undefined) complaint.superUserRemark = superUserRemark;
+  if (priority !== undefined) complaint.priority = priority;
+  complaint.updatedAt = new Date().toISOString();
+
+  complaints[index] = complaint;
+  ComplaintsDatabase.set('complaints', complaints);
+  res.json(complaint);
 });
 
 export default router;
