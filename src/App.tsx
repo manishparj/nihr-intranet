@@ -152,6 +152,182 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
   const lastProcessedBroadcastId = useRef<string | null>(null);
 
+  const formatExperience = (exp: any[]) => {
+    if (!exp || exp.length === 0) return 'None';
+    return exp.map(e => `${e.instituteName} (${e.designation}): ${e.fromDate} to ${e.toDate}`).join(' | ');
+  };
+
+  const escapeCSV = (val: any) => {
+    if (val === undefined || val === null) return '""';
+    let str = String(val);
+    str = str.replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const downloadCSV = (headers: string[], rows: any[][], fileName: string) => {
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(escapeCSV).join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportScientistsCSV = () => {
+    const headers = [
+      "ID", "Name", "Date of Birth", "Date of Joining", "Designation",
+      "Govt Email", "Personal Email", "Phone", "Employee Code", "Gender",
+      "Blood Group", "Emergency Contact", "Address", "Department Location",
+      "Room Number", "Category", "Status", "Last Working Date", "No Dues Cleared"
+    ];
+    const rows = scientists.map(s => [
+      s.id, s.name, s.dob, s.doj, s.designation,
+      s.govtEmail, s.personalEmail, s.phone, s.employeeCode, s.gender,
+      s.bloodGroup, s.emergencyContact, s.address, s.departmentLocation,
+      s.roomNumber, s.category, s.status, s.lastWorkingDate || '', s.noDuesCleared ? 'Yes' : 'No'
+    ]);
+    downloadCSV(headers, rows, "All_Scientists_Details.csv");
+  };
+
+  const exportPermanentStaffCSV = () => {
+    const headers = [
+      "ID", "Name", "Date of Birth", "Date of Joining", "Designation",
+      "Govt Email", "Personal Email", "Phone", "Employee Code", "Gender",
+      "Blood Group", "Emergency Contact", "Address", "Aadhaar Number", "PAN Number",
+      "Department Location", "Room Number", "Category", "Account Number", "IFSC Code",
+      "Bank Name", "Status", "Last Working Date", "Leaving Reason", "No Dues Cleared"
+    ];
+    const rows = permanentStaff.map(p => [
+      p.id, p.name, p.dob, p.doj, p.designation,
+      p.govtEmail, p.personalEmail, p.phone, p.employeeCode, p.gender,
+      p.bloodGroup, p.emergencyContact, p.address, p.aadhaarNumber, p.panNumber,
+      p.departmentLocation, p.roomNumber, p.category, p.accountNumber, p.ifscCode,
+      p.bankName, p.status, p.lastWorkingDate || '', p.leavingReason || '', p.noDuesCleared ? 'Yes' : 'No'
+    ]);
+    downloadCSV(headers, rows, "All_Permanent_Staff_Details.csv");
+  };
+
+  const exportProjectStaffCSV = () => {
+    const headers = [
+      "ID", "Project ID", "PI Scientist ID", "Name", "Date of Birth",
+      "Date of Joining", "Designation", "Email", "Phone", "Gender",
+      "Blood Group", "Emergency Contact", "Address", "Aadhaar Number", "PAN Number",
+      "Bank Name", "Account Number", "IFSC Code", "Department Location", "Room Number",
+      "Educational Qualification", "Contract Period (Months)", "Category", "Status",
+      "Last Working Date", "Leaving Reason", "No Dues Cleared", "Employee Code",
+      "Previous ICMR Experience", "Previous Non-ICMR Experience", "ICMR Exp Months", "Non-ICMR Exp Months", "Total Exp Months"
+    ];
+    const rows = projectStaff.map(p => [
+      p.id, p.projectId, p.scientistId, p.name, p.dob,
+      p.doj, p.designation, p.email, p.phone, p.gender,
+      p.bloodGroup, p.emergencyContact, p.address, p.aadhaarNumber, p.panNumber,
+      p.bankName, p.accountNumber, p.ifscCode, p.departmentLocation, p.roomNumber,
+      p.educationalQualification, p.contractPeriod, p.category, p.status,
+      p.lastWorkingDate || '', p.leavingReason || '', p.noDuesCleared ? 'Yes' : 'No', p.employeeCode,
+      formatExperience(p.previousIcmrExperience), formatExperience(p.previousNonIcmrExperience),
+      p.icmrExpMonths ?? 0, p.nonIcmrExpMonths ?? 0, p.totalExpMonths ?? 0
+    ]);
+    downloadCSV(headers, rows, "All_Project_Staff_Details.csv");
+  };
+
+  const exportYPConsultantCSV = () => {
+    const headers = [
+      "ID", "Name", "Date of Birth", "Date of Joining", "Full Designation",
+      "Designation Type", "Email", "Phone", "Gender", "Blood Group",
+      "Employee Code", "Aadhaar Number", "PAN Number", "Account Number", "IFSC Code",
+      "Bank Name", "Department Location", "Room Number", "Address", "Emergency Contact",
+      "Category", "Status", "Last Working Date", "Leaving Reason", "No Dues Cleared"
+    ];
+    const rows = ypConsultants.map(y => [
+      y.id, y.name, y.dob, y.doj, y.fullDesignation,
+      y.designationType, y.email, y.phone, y.gender, y.bloodGroup,
+      y.employeeCode, y.aadhaarNumber, y.panNumber, y.accountNumber, y.ifscCode,
+      y.bankName, y.departmentLocation, y.roomNumber, y.address, y.emergencyContact,
+      y.category, y.status, y.lastWorkingDate || '', y.leavingReason || '', y.noDuesCleared ? 'Yes' : 'No'
+    ]);
+    downloadCSV(headers, rows, "All_YP_and_Consultants_Details.csv");
+  };
+
+  const exportAllStaffIndividually = () => {
+    exportScientistsCSV();
+    setTimeout(() => exportPermanentStaffCSV(), 250);
+    setTimeout(() => exportProjectStaffCSV(), 500);
+    setTimeout(() => exportYPConsultantCSV(), 750);
+  };
+
+  const exportConsolidatedCategoryWiseCSV = () => {
+    const headers = [
+      "Staff Category", "ID", "Name", "Employee Code", "Date of Birth", "Date of Joining",
+      "Designation", "Designation Type", "Gender", "Blood Group", "Phone", "Email",
+      "Government Email", "Personal Email", "Address", "Emergency Contact", "Department Location",
+      "Room Number", "Social Category", "Status", "Last Working Date", "Leaving Reason",
+      "No Dues Cleared", "Project ID", "PI Scientist ID", "Aadhaar Number", "PAN Number",
+      "Bank Name", "Account Number", "IFSC Code", "Educational Qualification", "Contract Period (Months)",
+      "ICMR Exp Months", "Non-ICMR Exp Months", "Total Exp Months", "Previous ICMR Experience", "Previous Non-ICMR Experience"
+    ];
+
+    const rows: any[][] = [];
+
+    // Add Scientists
+    scientists.forEach(s => {
+      rows.push([
+        "Scientist", s.id, s.name, s.employeeCode, s.dob, s.doj,
+        s.designation, "Scientist", s.gender, s.bloodGroup, s.phone, "",
+        s.govtEmail, s.personalEmail, s.address, s.emergencyContact, s.departmentLocation,
+        s.roomNumber, s.category, s.status, s.lastWorkingDate || '', '',
+        s.noDuesCleared ? 'Yes' : 'No', "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+      ]);
+    });
+
+    // Add Permanent Staff
+    permanentStaff.forEach(p => {
+      rows.push([
+        "Permanent Staff", p.id, p.name, p.employeeCode, p.dob, p.doj,
+        p.designation, "Permanent Staff", p.gender, p.bloodGroup, p.phone, "",
+        p.govtEmail, p.personalEmail, p.address, p.emergencyContact, p.departmentLocation,
+        p.roomNumber, p.category, p.status, p.lastWorkingDate || '', p.leavingReason || '',
+        p.noDuesCleared ? 'Yes' : 'No', "", "", p.aadhaarNumber, p.panNumber,
+        p.bankName, p.accountNumber, p.ifscCode, "", "", "", "", "", "", ""
+      ]);
+    });
+
+    // Add Project Staff
+    projectStaff.forEach(p => {
+      rows.push([
+        "Project Staff", p.id, p.name, p.employeeCode, p.dob, p.doj,
+        p.designation, "Project Staff", p.gender, p.bloodGroup, p.phone, p.email,
+        "", "", p.address, p.emergencyContact, p.departmentLocation,
+        p.roomNumber, p.category, p.status, p.lastWorkingDate || '', p.leavingReason || '',
+        p.noDuesCleared ? 'Yes' : 'No', p.projectId, p.scientistId, p.aadhaarNumber, p.panNumber,
+        p.bankName, p.accountNumber, p.ifscCode, p.educationalQualification, p.contractPeriod,
+        p.icmrExpMonths ?? 0, p.nonIcmrExpMonths ?? 0, p.totalExpMonths ?? 0,
+        formatExperience(p.previousIcmrExperience), formatExperience(p.previousNonIcmrExperience)
+      ]);
+    });
+
+    // Add YP & Consultants
+    ypConsultants.forEach(y => {
+      rows.push([
+        "YP / Consultant", y.id, y.name, y.employeeCode, y.dob, y.doj,
+        y.fullDesignation, y.designationType, y.gender, y.bloodGroup, y.phone, y.email,
+        "", "", y.address, y.emergencyContact, y.departmentLocation,
+        y.roomNumber, y.category, y.status, y.lastWorkingDate || '', y.leavingReason || '',
+        y.noDuesCleared ? 'Yes' : 'No', "", "", y.aadhaarNumber, y.panNumber,
+        y.bankName, y.accountNumber, y.ifscCode, "", "", "", "", "", "", ""
+      ]);
+    });
+
+    downloadCSV(headers, rows, "Consolidated_Staff_Category_Wise.csv");
+  };
+
   // Initial Fetching
   const fetchAllData = async () => {
     setLoadingData(true);
@@ -1501,24 +1677,90 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               />
             </Col>
             <Col xs={24} lg={8}>
-              <Card 
-                title="⚙️ Quick Admin Panel" 
-                variant="borderless" 
-                className="shadow-sm rounded-xl"
-              >
-                <div className="space-y-3">
-                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('scientist'); }}>Register New Scientist</Button>
-                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('project'); }}>Initialize New Project</Button>
-                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}>Add Project Staff</Button>
-                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('perm'); }}>Add Permanent Staff</Button>
-                  <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}>Add YP/Consultant</Button>
-                  <Divider className="my-2" />
-                  <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('circular'); }}>Upload Office Circular</Button>
-                  <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('form'); }}>Upload Form Template</Button>
-                  <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('announcement'); }}>Add Announcement Bulletin</Button>
-                  <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('event'); }}>Schedule New Event</Button>
-                </div>
-              </Card>
+              <Space direction="vertical" className="w-full animate-fadeIn" size="middle">
+                <Card 
+                  title={<span className="font-extrabold text-xs sm:text-sm text-[#005EB8] dark:text-blue-400">⚙️ QUICK ADMIN PANEL</span>} 
+                  variant="borderless" 
+                  className="shadow-sm rounded-xl"
+                >
+                  <div className="space-y-3">
+                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('scientist'); }}>Register New Scientist</Button>
+                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('project'); }}>Initialize New Project</Button>
+                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}>Add Project Staff</Button>
+                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('perm'); }}>Add Permanent Staff</Button>
+                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}>Add YP/Consultant</Button>
+                    <Divider className="my-2" />
+                    <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('circular'); }}>Upload Office Circular</Button>
+                    <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('form'); }}>Upload Form Template</Button>
+                    <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('announcement'); }}>Add Announcement Bulletin</Button>
+                    <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('event'); }}>Schedule New Event</Button>
+                  </div>
+                </Card>
+
+                <Card 
+                  title={
+                    <div className="flex items-center gap-1.5 py-1">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                      <span className="font-extrabold text-xs sm:text-sm text-green-700 dark:text-green-400">📥 STAFF LEDGER DATA EXPORT</span>
+                    </div>
+                  }
+                  variant="borderless" 
+                  className="shadow-sm rounded-xl border border-green-100/50 dark:border-green-950/20"
+                >
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider mb-2">
+                        Option 1: Complete Separate Registries (All Fields)
+                      </div>
+                      <Row gutter={[8, 8]}>
+                        <Col span={12}>
+                          <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportScientistsCSV}>Scientists</Button>
+                        </Col>
+                        <Col span={12}>
+                          <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportPermanentStaffCSV}>Permanent Staff</Button>
+                        </Col>
+                        <Col span={12}>
+                          <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportProjectStaffCSV}>Project Staff</Button>
+                        </Col>
+                        <Col span={12}>
+                          <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportYPConsultantCSV}>YP & Consultants</Button>
+                        </Col>
+                      </Row>
+                    </div>
+
+                    <Button 
+                      type="dashed" 
+                      block 
+                      icon={<DownloadOutlined />} 
+                      className="text-[11px] rounded-lg font-bold text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50" 
+                      onClick={exportAllStaffIndividually}
+                    >
+                      Download All 4 CSVs (Separate Files)
+                    </Button>
+
+                    <Divider className="my-1.5" />
+
+                    <div>
+                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider mb-2">
+                        Option 2: Combined Ledger (Category-Wise)
+                      </div>
+                      <Button 
+                        type="primary" 
+                        block 
+                        icon={<DownloadOutlined />} 
+                        className="text-xs rounded-lg font-extrabold bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 border-0 flex items-center justify-center gap-1.5" 
+                        onClick={exportConsolidatedCategoryWiseCSV}
+                      >
+                        Export All Staff in 1 CSV (Grouped)
+                      </Button>
+                    </div>
+
+                    <p className="text-[9px] text-slate-400 dark:text-zinc-500 m-0 leading-relaxed italic bg-slate-50 dark:bg-zinc-950 p-2 rounded-lg border border-slate-100 dark:border-zinc-900">
+                      * This master sheet groups all personnel by category (Scientists, Permanent, Project, and YPs) and exports 100% of fields, skipping none.
+                    </p>
+                  </div>
+                </Card>
+              </Space>
             </Col>
           </Row>
         </div>
