@@ -1,0 +1,252 @@
+import axios from 'axios';
+import { 
+  Admin, Scientist, Project, ProjectStaff, PermanentStaff, 
+  YPConsultant, Circular, FormDocument, Announcement, Event, 
+  BroadcastMessage, VisibilityConfig 
+} from '../types';
+
+const API_BASE_URL = '/api';
+
+const client = axios.create({
+  baseURL: API_BASE_URL,
+});
+
+// Automatically inject JWT token into requests if present
+client.interceptors.request.use((config) => {
+  const token = localStorage.getItem('nihr_token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export const apiService = {
+  // Auth
+  getCaptcha: async () => {
+    const res = await client.get<{ captchaId: string; question: string }>('/auth/captcha');
+    return res.data;
+  },
+
+  login: async (data: any) => {
+    const res = await client.post<{ token: string; admin: Admin }>('/auth/login', data);
+    localStorage.setItem('nihr_token', res.data.token);
+    return res.data;
+  },
+
+  getCurrentAdmin: async () => {
+    const res = await client.get<{ admin: Admin }>('/auth/me');
+    return res.data.admin;
+  },
+
+  logout: () => {
+    localStorage.removeItem('nihr_token');
+  },
+
+  // Admins CRUD
+  getAdmins: async () => {
+    const res = await client.get<Admin[]>('/admins');
+    return res.data;
+  },
+  createAdmin: async (data: any) => {
+    const res = await client.post<Admin>('/admins', data);
+    return res.data;
+  },
+  updateAdmin: async (id: string, data: any) => {
+    const res = await client.put<Admin>(`/admins/${id}`, data);
+    return res.data;
+  },
+  deleteAdmin: async (id: string) => {
+    const res = await client.delete<{ success: boolean }>(`/admins/${id}`);
+    return res.data;
+  },
+
+  // Scientists CRUD
+  getScientists: async () => {
+    const res = await client.get<Scientist[]>('/scientists');
+    return res.data;
+  },
+  createScientist: async (data: any) => {
+    const res = await client.post<Scientist>('/scientists', data);
+    return res.data;
+  },
+  updateScientist: async (id: string, data: any) => {
+    const res = await client.put<Scientist>(`/scientists/${id}`, data);
+    return res.data;
+  },
+  deleteScientist: async (id: string) => {
+    const res = await client.delete(`/scientists/${id}`);
+    return res.data;
+  },
+
+  // Projects CRUD
+  getProjects: async () => {
+    const res = await client.get<Project[]>('/projects');
+    return res.data;
+  },
+  createProject: async (data: any) => {
+    const res = await client.post<Project>('/projects', data);
+    return res.data;
+  },
+  updateProject: async (id: string, data: any) => {
+    const res = await client.put<Project>(`/projects/${id}`, data);
+    return res.data;
+  },
+  deleteProject: async (id: string) => {
+    const res = await client.delete(`/projects/${id}`);
+    return res.data;
+  },
+
+  // Project Staff CRUD
+  getProjectStaff: async () => {
+    const res = await client.get<ProjectStaff[]>('/project-staff');
+    return res.data;
+  },
+  createProjectStaff: async (data: any) => {
+    const res = await client.post<ProjectStaff>('/project-staff', data);
+    return res.data;
+  },
+  updateProjectStaff: async (id: string, data: any) => {
+    const res = await client.put<ProjectStaff>(`/project-staff/${id}`, data);
+    return res.data;
+  },
+  deleteProjectStaff: async (id: string) => {
+    const res = await client.delete(`/project-staff/${id}`);
+    return res.data;
+  },
+
+  // Permanent Staff CRUD
+  getPermanentStaff: async () => {
+    const res = await client.get<PermanentStaff[]>('/permanent-staff');
+    return res.data;
+  },
+  createPermanentStaff: async (data: any) => {
+    const res = await client.post<PermanentStaff>('/permanent-staff', data);
+    return res.data;
+  },
+  updatePermanentStaff: async (id: string, data: any) => {
+    const res = await client.put<PermanentStaff>(`/permanent-staff/${id}`, data);
+    return res.data;
+  },
+  deletePermanentStaff: async (id: string) => {
+    const res = await client.delete(`/permanent-staff/${id}`);
+    return res.data;
+  },
+
+  // YP & Consultant CRUD
+  getYPConsultants: async () => {
+    const res = await client.get<YPConsultant[]>('/yp-consultants');
+    return res.data;
+  },
+  createYPConsultant: async (data: any) => {
+    const res = await client.post<YPConsultant>('/yp-consultants', data);
+    return res.data;
+  },
+  updateYPConsultant: async (id: string, data: any) => {
+    const res = await client.put<YPConsultant>(`/yp-consultants/${id}`, data);
+    return res.data;
+  },
+  deleteYPConsultant: async (id: string) => {
+    const res = await client.delete(`/yp-consultants/${id}`);
+    return res.data;
+  },
+
+  // Circulars CRUD
+  getCirculars: async () => {
+    const res = await client.get<Circular[]>('/circulars');
+    return res.data;
+  },
+  createCircular: async (data: any) => {
+    const res = await client.post<Circular>('/circulars', data);
+    return res.data;
+  },
+  updateCircular: async (id: string, data: any) => {
+    const res = await client.put<Circular>(`/circulars/${id}`, data);
+    return res.data;
+  },
+  deleteCircular: async (id: string) => {
+    const res = await client.delete(`/circulars/${id}`);
+    return res.data;
+  },
+
+  // Forms CRUD
+  getForms: async () => {
+    const res = await client.get<FormDocument[]>('/forms');
+    return res.data;
+  },
+  createForm: async (data: any) => {
+    const res = await client.post<FormDocument>('/forms', data);
+    return res.data;
+  },
+  updateForm: async (id: string, data: any) => {
+    const res = await client.put<FormDocument>(`/forms/${id}`, data);
+    return res.data;
+  },
+  deleteForm: async (id: string) => {
+    const res = await client.delete(`/forms/${id}`);
+    return res.data;
+  },
+
+  // Announcements CRUD
+  getAnnouncements: async () => {
+    const res = await client.get<Announcement[]>('/announcements');
+    return res.data;
+  },
+  createAnnouncement: async (data: any) => {
+    const res = await client.post<Announcement>('/announcements', data);
+    return res.data;
+  },
+  updateAnnouncement: async (id: string, data: any) => {
+    const res = await client.put<Announcement>(`/announcements/${id}`, data);
+    return res.data;
+  },
+  deleteAnnouncement: async (id: string) => {
+    const res = await client.delete(`/announcements/${id}`);
+    return res.data;
+  },
+
+  // Events CRUD
+  getEvents: async () => {
+    const res = await client.get<Event[]>('/events');
+    return res.data;
+  },
+  createEvent: async (data: any) => {
+    const res = await client.post<Event>('/events', data);
+    return res.data;
+  },
+  updateEvent: async (id: string, data: any) => {
+    const res = await client.put<Event>(`/events/${id}`, data);
+    return res.data;
+  },
+  deleteEvent: async (id: string) => {
+    const res = await client.delete(`/events/${id}`);
+    return res.data;
+  },
+
+  // Broadcast CRUD
+  getBroadcasts: async () => {
+    const res = await client.get<BroadcastMessage[]>('/broadcasts');
+    return res.data;
+  },
+  createBroadcast: async (data: any) => {
+    const res = await client.post<BroadcastMessage>('/broadcasts', data);
+    return res.data;
+  },
+  updateBroadcast: async (id: string, data: any) => {
+    const res = await client.put<BroadcastMessage>(`/broadcasts/${id}`, data);
+    return res.data;
+  },
+  deleteBroadcast: async (id: string) => {
+    const res = await client.delete(`/broadcasts/${id}`);
+    return res.data;
+  },
+
+  // Visibility Config
+  getVisibility: async () => {
+    const res = await client.get<VisibilityConfig>('/visibility');
+    return res.data;
+  },
+  updateVisibility: async (data: VisibilityConfig) => {
+    const res = await client.put<{ success: boolean; visibility: VisibilityConfig }>('/visibility', data);
+    return res.data.visibility;
+  },
+};

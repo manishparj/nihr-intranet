@@ -1,0 +1,6 @@
+{
+  "name": "NIHR Intranet",
+  "description": "A comprehensive Project & Staff Management System for NIHR, featuring scientist, staff, and project tracking, office circulars, forms, announcements, birthdays, and an announcement broadcast channel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
