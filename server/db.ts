@@ -194,6 +194,18 @@ export interface BroadcastMessage {
   senderName: string;
 }
 
+export interface SalarySlip {
+  id: string;
+  name: string;
+  employeeCode: string;
+  mobile: string;
+  aadhaarNumber: string;
+  month: string;
+  year: string;
+  uploadedAt: string;
+  details: Record<string, string>;
+}
+
 export interface VisibilityConfig {
   modules: {
     scientists: boolean;
@@ -233,6 +245,7 @@ export interface DatabaseSchema {
   events: Event[];
   broadcasts: BroadcastMessage[];
   visibility: VisibilityConfig;
+  salaries: SalarySlip[];
 }
 
 const DEFAULT_VISIBILITY: VisibilityConfig = {
@@ -550,6 +563,7 @@ const INITIAL_DATA: DatabaseSchema = {
     },
   ],
   visibility: DEFAULT_VISIBILITY,
+  salaries: [],
 };
 
 export class Database {
@@ -601,6 +615,7 @@ export class Database {
         if (!this.data.events) this.data.events = INITIAL_DATA.events;
         if (!this.data.broadcasts) this.data.broadcasts = INITIAL_DATA.broadcasts;
         if (!this.data.visibility) this.data.visibility = INITIAL_DATA.visibility;
+        if (!this.data.salaries) this.data.salaries = [];
       }
       return this.data!;
     } catch (e) {

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { 
   Admin, Scientist, Project, ProjectStaff, PermanentStaff, 
   YPConsultant, Circular, FormDocument, Announcement, Event, 
-  BroadcastMessage, VisibilityConfig 
+  BroadcastMessage, VisibilityConfig, SalarySlip
 } from '../types';
 
 const API_BASE_URL = '/api';
@@ -284,6 +284,24 @@ export const apiService = {
         Authorization: `Bearer ${token}`
       }
     });
+    return res.data;
+  },
+
+  // Salary Slips System
+  getSalaries: async () => {
+    const res = await client.get<SalarySlip[]>('/salaries');
+    return res.data;
+  },
+  uploadSalaryCSV: async (data: { csvText: string; month: string; year: string }) => {
+    const res = await client.post<{ success: boolean; message: string }>('/salaries/upload', data);
+    return res.data;
+  },
+  loginSalaryPortal: async (data: { mobile: string; aadhaarNumber: string; month: string; year: string }) => {
+    const res = await client.post<{ success: boolean; salarySlip: SalarySlip }>('/salaries/login', data);
+    return res.data;
+  },
+  deleteSalarySlip: async (id: string) => {
+    const res = await client.delete<{ success: boolean; message: string }>(`/salaries/${id}`);
     return res.data;
   }
 };

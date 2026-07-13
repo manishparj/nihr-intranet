@@ -10,14 +10,14 @@ import {
   LogoutOutlined, LoginOutlined, SearchOutlined, PlusOutlined, EditOutlined, 
   DeleteOutlined, BulbOutlined, BulbFilled, TeamOutlined, KeyOutlined, 
   UnlockOutlined, InfoCircleOutlined, DownloadOutlined, StarOutlined, LockOutlined,
-  AppstoreOutlined, CustomerServiceOutlined
+  AppstoreOutlined, CustomerServiceOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import { Formik, Form, Field } from 'formik';
 import { apiService } from './services/api';
 import { 
   Admin, Scientist, Project, ProjectStaff, PermanentStaff, 
   YPConsultant, Circular, FormDocument, Announcement, Event, 
-  BroadcastMessage, VisibilityConfig 
+  BroadcastMessage, VisibilityConfig, SalarySlip
 } from './types';
 import { BroadcastFeed } from './components/BroadcastFeed';
 import { VisibilityPanel } from './components/VisibilityPanel';
@@ -25,6 +25,7 @@ import { DashboardOverview } from './components/DashboardOverview';
 import { ScientistForm, ProjectForm } from './components/AdminForms';
 import { ProjectStaffForm, PermanentStaffForm, YPConsultantForm } from './components/StaffForms';
 import { ComplaintPortal } from './components/ComplaintPortal';
+import { SalaryPortalView, AdminSalariesManager } from './components/SalaryPortal';
 
 const { Header, Content, Footer, Sider } = Layout;
 
@@ -150,11 +151,131 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     setViewDetailModalVisible(true);
   };
 
+  // No salary slip modal state needed anymore
+
   const lastProcessedBroadcastId = useRef<string | null>(null);
 
   const formatExperience = (exp: any[]) => {
     if (!exp || exp.length === 0) return 'None';
     return exp.map(e => `${e.instituteName} (${e.designation}): ${e.fromDate} to ${e.toDate}`).join(' | ');
+  };
+
+  const parseDateFlexible = (dateStr: string): Date => {
+    if (!dateStr) return new Date(NaN);
+    let d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d;
+    
+    // Support DD-MM-YYYY or DD/MM/YYYY
+    const parts = dateStr.trim().split(/[-/]/);
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      } else {
+        d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+      }
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date(NaN);
+  };
+
+  const getPeriodYMD = (fromDateStr: string, toDateStr: string) => {
+    const start = parseDateFlexible(fromDateStr);
+    const end = parseDateFlexible(toDateStr);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
+      return { y: 0, m: 0, d: 0 };
+    }
+    
+    let years = end.getFullYear() - start.getFullYear();
+    let months = end.getMonth() - start.getMonth();
+    let days = end.getDate() - start.getDate() + 1; // inclusive of end date
+    
+    if (days < 0) {
+      months--;
+      const prevMonth = new Date(end.getFullYear(), end.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    
+    return { y: years, m: months, d: days };
+  };
+
+  const formatYMD = (ymd: { y: number; m: number; d: number }): string => {
+    return `${ymd.y}-${ymd.m}-${ymd.d}`;
+  };
+
+  const calculateStaffExperienceYMD = (staff: any) => {
+    let icmrY = 0, icmrM = 0, icmrD = 0;
+    if (staff && staff.previousIcmrExperience && Array.isArray(staff.previousIcmrExperience)) {
+      staff.previousIcmrExperience.forEach((entry: any) => {
+        const ymd = getPeriodYMD(entry.fromDate, entry.toDate);
+        icmrY += ymd.y;
+        icmrM += ymd.m;
+        icmrD += ymd.d;
+      });
+    }
+    
+    let nonIcmrY = 0, nonIcmrM = 0, nonIcmrD = 0;
+    if (staff && staff.previousNonIcmrExperience && Array.isArray(staff.previousNonIcmrExperience)) {
+      staff.previousNonIcmrExperience.forEach((entry: any) => {
+        const ymd = getPeriodYMD(entry.fromDate, entry.toDate);
+        nonIcmrY += ymd.y;
+        nonIcmrM += ymd.m;
+        nonIcmrD += ymd.d;
+      });
+    }
+    
+    // Current Experience: DOJ to Today (or lastWorkingDate if they left)
+    let currentY = 0, currentM = 0, currentD = 0;
+    if (staff && staff.doj) {
+      const fromDate = staff.doj;
+      const toDate = staff.status === 'Left' && staff.lastWorkingDate
+        ? staff.lastWorkingDate
+        : new Date().toISOString().split('T')[0];
+        
+      const ymd = getPeriodYMD(fromDate, toDate);
+      currentY = ymd.y;
+      currentM = ymd.m;
+      currentD = ymd.d;
+    }
+    
+    // Sum and Carry over
+    // ICMR
+    icmrM += Math.floor(icmrD / 30);
+    icmrD = icmrD % 30;
+    icmrY += Math.floor(icmrM / 12);
+    icmrM = icmrM % 12;
+    
+    // Non-ICMR
+    nonIcmrM += Math.floor(nonIcmrD / 30);
+    nonIcmrD = nonIcmrD % 30;
+    nonIcmrY += Math.floor(nonIcmrM / 12);
+    nonIcmrM = nonIcmrM % 12;
+    
+    // Current
+    currentM += Math.floor(currentD / 30);
+    currentD = currentD % 30;
+    currentY += Math.floor(currentM / 12);
+    currentM = currentM % 12;
+    
+    // Total combined
+    let totalY = icmrY + nonIcmrY + currentY;
+    let totalM = icmrM + nonIcmrM + currentM;
+    let totalD = icmrD + nonIcmrD + currentD;
+    
+    totalM += Math.floor(totalD / 30);
+    totalD = totalD % 30;
+    totalY += Math.floor(totalM / 12);
+    totalM = totalM % 12;
+    
+    return {
+      icmr: { y: icmrY, m: icmrM, d: icmrD },
+      nonIcmr: { y: nonIcmrY, m: nonIcmrM, d: nonIcmrD },
+      current: { y: currentY, m: currentM, d: currentD },
+      total: { y: totalY, m: totalM, d: totalD }
+    };
   };
 
   const escapeCSV = (val: any) => {
@@ -794,7 +915,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     { title: 'Bank Name', dataIndex: 'bankName', key: 'bankName', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 masked') },
     { title: 'Account Number', dataIndex: 'accountNumber', key: 'accountNumber', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 masked') },
     { title: 'IFSC Code', dataIndex: 'ifscCode', key: 'ifscCode', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 masked') },
-    { title: 'Total Exp', dataIndex: 'totalExpMonths', key: 'totalExpMonths', render: (val: number) => <Tag color="blue">{val || 0} mos</Tag>, sorter: (a: any, b: any) => (a.totalExpMonths || 0) - (b.totalExpMonths || 0) },
+    { title: 'Total Exp (Y-M-D)', key: 'totalExpYMD', render: (_: any, rec: ProjectStaff) => {
+      const expYMD = calculateStaffExperienceYMD(rec);
+      return <Tag color="blue" title={`${rec.totalExpMonths || 0} Months cumulative`}>{formatYMD(expYMD.total)}</Tag>;
+    }, sorter: (a: any, b: any) => (a.totalExpMonths || 0) - (b.totalExpMonths || 0) },
     { title: 'Category', dataIndex: 'category', key: 'category', render: (c: string) => <Tag color="purple">{c}</Tag> },
     { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> },
     ...(isAuthenticated ? [{
@@ -1317,7 +1441,19 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               />
             </Card>
           )
-        }] : [])
+        }] : []),
+        {
+          key: 'salary-portal',
+          label: (
+            <span>
+              <PrinterOutlined />
+              Project Staff Salary Portal
+            </span>
+          ),
+          children: (
+            <SalaryPortalView />
+          )
+        }
       ];
 
       return (
@@ -1780,6 +1916,13 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       );
     }
 
+    // C2. Super Admin Salaries Manager (CSV upload & logs)
+    if (currentKey === 'admin-salaries') {
+      return (
+        <AdminSalariesManager projectStaff={projectStaff} />
+      );
+    }
+
     // D. CRUD Listings Views (Scientists, Projects, Staff types, Circulars, Forms, Events)
     let title = '';
     let columns: any[] = [];
@@ -2046,6 +2189,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                           { key: 'admin-project-staff', icon: <SolutionOutlined />, label: 'Project Staff' },
                           { key: 'admin-permanent-staff', icon: <TeamOutlined />, label: 'Permanent Staff' },
                           { key: 'admin-yp-consultants', icon: <StarOutlined />, label: 'YP & Consultants' },
+                          { key: 'admin-salaries', icon: <PrinterOutlined />, label: 'Staff Salaries (CSV)' },
                         ]
                       },
                       {
@@ -2366,7 +2510,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <Button key="close" type="primary" onClick={() => setViewDetailModalVisible(false)}>
               Close Profile View
             </Button>
-          ]}
+          ].filter(Boolean)}
           width={700}
           className="rounded-xl overflow-hidden"
         >
@@ -2556,8 +2700,49 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 {viewDetailType === 'pstaff' && (
                   <Col xs={24}>
                     <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
-                      🎓 Historical Service Experience Records
+                      🎓 Historical Service Experience Records & Tenure Analysis
                     </h4>
+
+                    {/* Year-Months-Days Breakdown Grid */}
+                    {(() => {
+                      const expYMD = calculateStaffExperienceYMD(viewDetailRecord);
+                      return (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+                          <div className="bg-slate-50 dark:bg-zinc-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-center">
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ICMR Exp</div>
+                            <div className="text-sm font-black text-slate-700 dark:text-zinc-200 mt-1 font-mono">
+                              {formatYMD(expYMD.icmr)}
+                            </div>
+                            <div className="text-[9px] text-slate-400 italic">Years-Months-Days</div>
+                          </div>
+                          
+                          <div className="bg-slate-50 dark:bg-zinc-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-center">
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Non-ICMR Exp</div>
+                            <div className="text-sm font-black text-slate-700 dark:text-zinc-200 mt-1 font-mono">
+                              {formatYMD(expYMD.nonIcmr)}
+                            </div>
+                            <div className="text-[9px] text-slate-400 italic">Years-Months-Days</div>
+                          </div>
+
+                          <div className="bg-blue-50/40 dark:bg-blue-950/10 p-2.5 rounded-lg border border-blue-100/30 dark:border-blue-900/20 text-center">
+                            <div className="text-[10px] text-blue-500 font-bold uppercase tracking-wider">Current Exp</div>
+                            <div className="text-sm font-black text-blue-600 dark:text-blue-400 mt-1 font-mono">
+                              {formatYMD(expYMD.current)}
+                            </div>
+                            <div className="text-[9px] text-blue-400 italic">DOJ to Today</div>
+                          </div>
+
+                          <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100/40 dark:border-indigo-900/30 text-center">
+                            <div className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Total Experience</div>
+                            <div className="text-sm font-black text-indigo-600 dark:text-indigo-400 mt-1 font-mono">
+                              {formatYMD(expYMD.total)}
+                            </div>
+                            <div className="text-[9px] text-indigo-400 italic">Combined Y-M-D</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-100/50 dark:border-blue-900/30 mb-3 text-xs flex justify-between items-center">
                       <span className="font-semibold text-blue-800 dark:text-blue-300">Cumulative Experience Month Totals:</span>
                       <span className="font-bold text-blue-600 dark:text-blue-400">

@@ -16,7 +16,8 @@ import {
   Event, 
   BroadcastMessage, 
   VisibilityConfig,
-  ExperienceEntry
+  ExperienceEntry,
+  SalarySlip
 } from './db';
 import { ComplaintsDatabase } from './complaints_db';
 
@@ -1092,6 +1093,384 @@ router.put('/complaints/:id', (req: Request, res: Response) => {
   complaints[index] = complaint;
   ComplaintsDatabase.set('complaints', complaints);
   res.json(complaint);
+});
+
+// ==========================================
+// PROJECT STAFF SALARY SLIPS SYSTEM
+// ==========================================
+
+function parseCSV(text: string): { headers: string[], rows: Record<string, string>[] } {
+  const lines: string[] = [];
+  let currentLine = '';
+  let insideQuotes = false;
+  
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      insideQuotes = !insideQuotes;
+      currentLine += char;
+    } else if ((char === '\n' || char === '\r') && !insideQuotes) {
+      if (currentLine.trim()) {
+        lines.push(currentLine);
+      }
+      currentLine = '';
+      if (char === '\r' && text[i + 1] === '\n') {
+        i++;
+      }
+    } else {
+      currentLine += char;
+    }
+  }
+  if (currentLine.trim()) {
+    lines.push(currentLine);
+  }
+
+  if (lines.length === 0) {
+    return { headers: [], rows: [] };
+  }
+
+  const parseLine = (line: string): string[] => {
+    const result: string[] = [];
+    let cur = '';
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        inQuote = !inQuote;
+      } else if (c === ',' && !inQuote) {
+        result.push(cur.trim());
+        cur = '';
+      } else {
+        cur += c;
+      }
+    }
+    result.push(cur.trim());
+    return result.map(val => {
+      if (val.startsWith('"') && val.endsWith('"')) {
+        return val.substring(1, val.length - 1).replace(/""/g, '"').trim();
+      }
+      return val.trim();
+    });
+  };
+
+  const rawHeaders = parseLine(lines[0]);
+  const headers = rawHeaders.map(h => h.trim());
+
+  const rows: Record<string, string>[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseLine(lines[i]);
+    const row: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] || '';
+    });
+    rows.push(row);
+  }
+
+  return { headers, rows };
+}
+
+function findField(row: Record<string, string>, keywords: string[], fallback: string = ''): string {
+  const keys = Object.keys(row);
+  // 1. Try exact normalized match first
+  for (const keyword of keywords) {
+    const cleanKeyword = keyword.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const foundKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanKeyword);
+    if (foundKey && row[foundKey] !== undefined) {
+      return row[foundKey].trim();
+    }
+  }
+  // 2. Fall back to partial normalized match
+  for (const keyword of keywords) {
+    const cleanKeyword = keyword.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const foundKey = keys.find(k => k.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanKeyword));
+    if (foundKey && row[foundKey] !== undefined) {
+      return row[foundKey].trim();
+    }
+  }
+  return fallback;
+}
+
+function normalizeMonth(monthVal: string): string {
+  const m = monthVal.trim().toLowerCase();
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June', 
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const shortMonths = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  
+  // Check if it is a number (e.g. "4" or "04")
+  const parsedNum = parseInt(m, 10);
+  if (!isNaN(parsedNum) && parsedNum >= 1 && parsedNum <= 12) {
+    return monthNames[parsedNum - 1];
+  }
+  
+  // Check if it matches short month
+  const shortIndex = shortMonths.indexOf(m.substring(0, 3));
+  if (shortIndex !== -1) {
+    return monthNames[shortIndex];
+  }
+
+  // Fallback to title casing or original value
+  if (m.length > 0) {
+    return monthVal.charAt(0).toUpperCase() + monthVal.slice(1).toLowerCase();
+  }
+  return monthVal;
+}
+
+function normalizeYear(yearVal: string): string {
+  const y = yearVal.trim();
+  if (y.length === 2) {
+    return `20${y}`;
+  }
+  return y;
+}
+
+function getDaysInMonth(monthName: string, yearStr: string): number {
+  const monthIndex = [
+    'january', 'february', 'march', 'april', 'may', 'june', 
+    'july', 'august', 'september', 'october', 'november', 'december'
+  ].indexOf(monthName.toLowerCase());
+  if (monthIndex === -1) return 30; // fallback
+  const y = parseInt(yearStr, 10) || 2026;
+  return new Date(y, monthIndex + 1, 0).getDate();
+}
+
+// Get all uploaded salaries (admin only)
+router.get('/salaries', authenticateAdmin, (req: Request, res: Response) => {
+  const salaries = Database.get('salaries') || [];
+  res.json(salaries);
+});
+
+// Upload CSV salaries (admin only)
+router.post('/salaries/upload', authenticateAdmin, (req: Request, res: Response) => {
+  const { csvText, month, year } = req.body;
+  if (!csvText || !month || !year) {
+    return res.status(400).json({ error: 'CSV data, Month, and Year are required.' });
+  }
+
+  try {
+    const { headers, rows } = parseCSV(csvText);
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'No data rows found in the CSV file.' });
+    }
+
+    const salaries = Database.get('salaries') || [];
+    const projectStaffList = Database.get('projectStaff') || [];
+    const projectsList = Database.get('projects') || [];
+    const scientistsList = Database.get('scientists') || [];
+
+    const newSalaries = rows.map(row => {
+      // 1. Identify primary fields
+      let staffName = findField(row, ['employeename', 'name', 'staffname', 'staff', 'employee']);
+      let empCode = findField(row, ['employeecode', 'empcode', 'tempcode', 'code', 'staffcode', 'id']);
+      let mobile = findField(row, ['mobilenumber', 'phonenumber', 'mobile', 'phone', 'contact']).replace(/[^0-9]/g, '');
+      let aadhaar = findField(row, ['aadhaarnumber', 'aadhaar', 'aadharnumber', 'aadhar']).replace(/[^0-9-]/g, '');
+      let rawMonth = findField(row, ['paymonth', 'month', 'salarymonth'], month);
+      let rawYear = findField(row, ['payyear', 'year', 'salaryyear'], year);
+
+      let rowMonth = normalizeMonth(rawMonth);
+      let rowYear = normalizeYear(rawYear);
+
+      // Match in Project Staff List for fallback
+      const matchedStaff = projectStaffList.find((s: ProjectStaff) => 
+        (empCode && s.employeeCode && s.employeeCode.toLowerCase().trim() === empCode.toLowerCase().trim()) ||
+        (staffName && s.name && s.name.toLowerCase().trim() === staffName.toLowerCase().trim()) ||
+        (aadhaar && s.aadhaarNumber && s.aadhaarNumber.replace(/[^0-9]/g, '') === aadhaar.replace(/[^0-9]/g, ''))
+      );
+
+      const matchedProject = matchedStaff ? projectsList.find((p: any) => p.id === matchedStaff.projectId) : null;
+      const matchedScientist = matchedStaff ? scientistsList.find((s: any) => s.id === matchedStaff.scientistId) : null;
+
+      if (matchedStaff) {
+        if (!mobile) mobile = matchedStaff.phone.replace(/[^0-9]/g, '');
+        if (!aadhaar) aadhaar = matchedStaff.aadhaarNumber;
+        if (!empCode) empCode = matchedStaff.employeeCode;
+        if (!staffName) staffName = matchedStaff.name;
+      }
+
+      const cleanAadhaar = aadhaar.replace(/[^0-9]/g, '');
+
+      // 2. Parse financial & attendance numbers
+      const basicPayStr = findField(row, ['basicpay', 'basic_pay', 'basic'], '0');
+      const basicPay = parseFloat(basicPayStr.replace(/[^0-9.]/g, '')) || 0;
+
+      const hraStr = findField(row, ['hra'], '0');
+      const hra = parseFloat(hraStr.replace(/[^0-9.]/g, '')) || 0;
+
+      // Attendance and Leaves
+      const prevLeaveBrought = parseFloat(findField(row, ['balanceleavebrought', 'balance_leave_brought_from_previous_month'], '0').replace(/[^0-9.-]/g, '')) || 0;
+      const leaveCredit = parseFloat(findField(row, ['leavecreditas', 'leavecredit', 'leave_credit_as_on_last_month_last_day'], '0').replace(/[^0-9.-]/g, '')) || 0;
+      const totalLeave = parseFloat(findField(row, ['totalleave', 'total_leave'], '0').replace(/[^0-9.-]/g, '')) || 0;
+      const leaveAvailed = parseFloat(findField(row, ['leaveavailed', 'leave_availed_during_the_month'], '0').replace(/[^0-9.-]/g, '')) || 0;
+      const leaveBalance = parseFloat(findField(row, ['leavebalance', 'leave_balance_as_on'], '0').replace(/[^0-9.-]/g, '')) || 0;
+      const leaveWithoutPay = parseFloat(findField(row, ['leavewithoutpay', 'leave_without_pay'], '0').replace(/[^0-9.-]/g, '')) || 0;
+      const totalPresentDays = parseFloat(findField(row, ['totalpresentday', 'total_present_day'], '0').replace(/[^0-9.-]/g, '')) || 0;
+
+      // Calculate tenure up to if contractPeriod exists (contractPeriod is in months, e.g. 12, added to doj)
+      let calculatedTenure = '';
+      if (matchedStaff?.doj && matchedStaff?.contractPeriod) {
+        try {
+          const dojParts = matchedStaff.doj.split('-');
+          if (dojParts.length === 3) {
+            const dojDate = new Date(parseInt(dojParts[2], 10), parseInt(dojParts[1], 10) - 1, parseInt(dojParts[0], 10));
+            if (!isNaN(dojDate.getTime())) {
+              dojDate.setMonth(dojDate.getMonth() + matchedStaff.contractPeriod);
+              calculatedTenure = `${String(dojDate.getDate()).padStart(2, '0')}-${String(dojDate.getMonth() + 1).padStart(2, '0')}-${dojDate.getFullYear()}`;
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Project context metadata
+      const projectName = findField(row, ['projectname', 'project_name', 'project'], matchedProject?.name || '');
+      const scientistName = findField(row, ['scientistname', 'scientist_name', 'scientist'], matchedScientist?.name || '');
+      const scientistDesignation = findField(row, ['scientistdesignation', 'scientist_designation'], matchedScientist?.designation || '');
+      const doj = findField(row, ['doj', 'dateofjoining'], matchedStaff?.doj || '');
+      const tenureUpTo = findField(row, ['tenureupto', 'tenure_up_to'], calculatedTenure || '');
+      const designation = findField(row, ['designation', 'staffdesignation'], matchedStaff?.designation || '');
+      const address = findField(row, ['address'], matchedStaff?.address || '');
+      const panNumber = findField(row, ['pannumber', 'pan_number', 'pan'], '');
+      const bankName = findField(row, ['bankname', 'bank_name', 'bank'], '');
+      const accountNumber = findField(row, ['accountnumber', 'account_number', 'account'], '');
+      const ifscCode = findField(row, ['ifsccode', 'ifsc_code', 'ifsc'], '');
+
+      const daysInMonth = getDaysInMonth(rowMonth, rowYear);
+
+      // 3. Dynamic evaluations (handle formulas like "BASIC + HRA" or pre-calculated cells)
+      const grossRaw = findField(row, ['grossremuneration', 'gross_remuneration', 'grosspay', 'gross'], '');
+      let grossPay = 0;
+      if (grossRaw && !isNaN(parseFloat(grossRaw.replace(/[^0-9.]/g, '')))) {
+        grossPay = parseFloat(grossRaw.replace(/[^0-9.]/g, ''));
+      } else {
+        grossPay = basicPay + hra;
+      }
+
+      const taxRaw = findField(row, ['incometax', 'income_tax_deduction', 'tax', 'itdeduction'], '0');
+      const taxDeduction = parseFloat(taxRaw.replace(/[^0-9.]/g, '')) || 0;
+
+      const dedRaw = findField(row, ['lwpdeduction', 'lwp_deduction', 'deduction', 'otherdeductions'], '');
+      let deduction = 0;
+      if (dedRaw && !isNaN(parseFloat(dedRaw.replace(/[^0-9.]/g, '')))) {
+        deduction = parseFloat(dedRaw.replace(/[^0-9.]/g, ''));
+      } else {
+        // Evaluate deduction formula if empty: LWP * (Basic / daysInMonth)
+        const absentDays = Math.max(0, daysInMonth - totalPresentDays);
+        const lwpDays = leaveWithoutPay > 0 ? leaveWithoutPay : absentDays;
+        deduction = Math.round(lwpDays * (basicPay / daysInMonth));
+      }
+
+      const netRaw = findField(row, ['netpay', 'net_pay', 'nettakehome'], '');
+      let netPay = 0;
+      if (netRaw && !isNaN(parseFloat(netRaw.replace(/[^0-9.]/g, '')))) {
+        netPay = parseFloat(netRaw.replace(/[^0-9.]/g, ''));
+      } else {
+        netPay = grossPay - (taxDeduction + deduction);
+      }
+
+      const structuredDetails: Record<string, string> = {
+        'Employee Code': empCode || 'TEMP-CODE',
+        'Employee Name': staffName || 'Project Staff',
+        'Designation': designation || 'Staff Member',
+        'Date of Joining': doj || '-',
+        'Tenure Up To': tenureUpTo || '-',
+        'Project Name': projectName || '-',
+        'Scientist Name': scientistName || '-',
+        'Scientist Designation': scientistDesignation || '-',
+        'Address': address || '-',
+        'PAN Number': panNumber || '-',
+        'Bank Name': bankName || '-',
+        'Account Number': accountNumber || '-',
+        'IFSC Code': ifscCode || '-',
+        'Basic Pay': `₹${basicPay.toLocaleString('en-IN')}`,
+        'HRA': `₹${hra.toLocaleString('en-IN')}`,
+        'Days in Month': daysInMonth.toString(),
+        'Total Present Days': totalPresentDays.toString(),
+        'Balance Leave Brought': prevLeaveBrought.toString(),
+        'Leave Credit': leaveCredit.toString(),
+        'Total Leave': totalLeave.toString(),
+        'Leave Availed': leaveAvailed.toString(),
+        'Leave Balance': leaveBalance.toString(),
+        'Leave Without Pay': leaveWithoutPay.toString(),
+        'Gross Remuneration': `₹${grossPay.toLocaleString('en-IN')}`,
+        'Income Tax Deduction': `₹${taxDeduction.toLocaleString('en-IN')}`,
+        'Leave Without Pay Deduction': `₹${deduction.toLocaleString('en-IN')}`,
+        'Net Pay': `₹${netPay.toLocaleString('en-IN')}`
+      };
+
+      return {
+        id: `sal-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        name: staffName || 'Project Staff',
+        employeeCode: empCode || 'TEMP-CODE',
+        mobile: mobile,
+        aadhaarNumber: cleanAadhaar,
+        month: rowMonth,
+        year: rowYear,
+        uploadedAt: new Date().toISOString(),
+        details: structuredDetails
+      };
+    });
+
+    // Remove existing matching records for same month and year
+    const filteredSalaries = salaries.filter(s => 
+      !(s.month.toLowerCase() === month.toLowerCase() && s.year === year)
+    );
+
+    const updatedSalaries = [...filteredSalaries, ...newSalaries];
+    Database.set('salaries', updatedSalaries);
+
+    res.json({ 
+      success: true, 
+      message: `Successfully processed and saved ${newSalaries.length} salary records for ${month} ${year}.` 
+    });
+  } catch (error: any) {
+    console.error('Error processing salary CSV:', error);
+    res.status(500).json({ error: `Failed to process CSV file: ${error.message}` });
+  }
+});
+
+// Public Login to Salary Portal
+router.post('/salaries/login', (req: Request, res: Response) => {
+  const { mobile, aadhaarNumber, month, year } = req.body;
+
+  if (!mobile || !aadhaarNumber || !month || !year) {
+    return res.status(400).json({ error: 'Mobile number, Aadhaar number, Month, and Year are required.' });
+  }
+
+  const cleanMobile = mobile.replace(/[^0-9]/g, '').trim();
+  const cleanAadhaar = aadhaarNumber.replace(/[^0-9]/g, '').trim();
+
+  if (!cleanMobile || !cleanAadhaar) {
+    return res.status(400).json({ error: 'Please enter valid Mobile and Aadhaar numbers.' });
+  }
+
+  const salaries = Database.get('salaries') || [];
+  
+  // Match by mobile and aadhaar (using endsWith to support country code prefixes or partial records)
+  const record = salaries.find(s => {
+    const sMobile = s.mobile.replace(/[^0-9]/g, '');
+    const sAadhaar = s.aadhaarNumber.replace(/[^0-9]/g, '');
+    return sMobile.endsWith(cleanMobile) && 
+           sAadhaar.endsWith(cleanAadhaar) && 
+           s.month.toLowerCase() === month.toLowerCase() && 
+           s.year === year;
+  });
+
+  if (!record) {
+    return res.status(404).json({ error: 'No salary record found matching Mobile, Aadhaar, Month, and Year.' });
+  }
+
+  res.json({ success: true, salarySlip: record });
+});
+
+// Delete a specific salary slip (admin only)
+router.delete('/salaries/:id', authenticateAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const salaries = Database.get('salaries') || [];
+  const filtered = salaries.filter(s => s.id !== id);
+  Database.set('salaries', filtered);
+  res.json({ success: true, message: 'Salary slip deleted successfully.' });
 });
 
 export default router;

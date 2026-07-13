@@ -248,3 +248,15 @@ export interface ComplaintSuperUser {
   email: string;
   department: 'IT' | 'Maintenance' | 'Admin';
 }
+
+export interface SalarySlip {
+  id: string;
+  name: string;
+  employeeCode: string;
+  mobile: string;
+  aadhaarNumber: string;
+  month: string;
+  year: string;
+  uploadedAt: string;
+  details: Record<string, string>;
+}
