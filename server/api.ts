@@ -251,7 +251,7 @@ router.put('/admins/:id', authenticateAdmin, (req: Request, res: Response) => {
   }
 
   // Prevent editing default primary admin ID to protect lockouts
-  if (id === 'admin-1' && email.toLowerCase() !== 'icmrdigicare@gmail.com') {
+  if (id === 'admin-1' && email.toLowerCase() !== 'itcellnihr@gmail.com') {
     return res.status(400).json({ error: 'Primary admin email cannot be changed.' });
   }
 
