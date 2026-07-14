@@ -80,7 +80,7 @@ export function AppHeader({
       },
       { key: 'admin-visibility', icon: <SettingOutlined />, label: 'Visibility' },
       { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Complaints Desk' },
-      { key: 'admin-accounts', icon: <KeyOutlined />, label: 'Admin Accounts' },
+      ...(currentAdmin?.id === 'admin-1' ? [{ key: 'admin-accounts', icon: <KeyOutlined />, label: 'Admin Accounts' }] : []),
       { key: 'public-dashboard', icon: <HomeOutlined />, label: 'View Public' }
     ];
   };
@@ -176,7 +176,7 @@ export function AppHeader({
 
       {/* 2. SUB-HEADER HORIZONTAL TABS BAR */}
       <div className="bg-white dark:bg-zinc-900 border-b border-slate-200/80 dark:border-zinc-800/80 sticky top-16 z-40 shadow-sm select-none">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 overflow-x-auto scrollbar-none flex items-center justify-start md:justify-center">
+        <div className="max-w-10xl mx-auto px-4 md:px-8 overflow-x-auto scrollbar-none flex items-center justify-start md:justify-center">
           <Menu
             mode="horizontal"
             selectedKeys={[currentKey]}

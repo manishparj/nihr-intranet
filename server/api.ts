@@ -212,12 +212,18 @@ router.get('/auth/me', authenticateAdmin, (req: AuthenticatedRequest, res: Respo
 // ==========================================
 // SUPER ADMIN ENDPOINTS (CRUD)
 // ==========================================
-router.get('/admins', authenticateAdmin, (req: Request, res: Response) => {
+router.get('/admins', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
+  if (req.admin?.id !== 'admin-1') {
+    return res.status(403).json({ error: 'Access denied. Only the primary admin can manage admin accounts.' });
+  }
   const admins = Database.get('admins').map(({ id, name, email }) => ({ id, name, email }));
   res.json(admins);
 });
 
-router.post('/admins', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/admins', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
+  if (req.admin?.id !== 'admin-1') {
+    return res.status(403).json({ error: 'Access denied. Only the primary admin can manage admin accounts.' });
+  }
   const { name, email, password } = req.body;
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'All fields are required.' });
@@ -240,7 +246,10 @@ router.post('/admins', authenticateAdmin, (req: Request, res: Response) => {
   res.status(201).json({ id: newAdmin.id, name: newAdmin.name, email: newAdmin.email });
 });
 
-router.put('/admins/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/admins/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
+  if (req.admin?.id !== 'admin-1') {
+    return res.status(403).json({ error: 'Access denied. Only the primary admin can manage admin accounts.' });
+  }
   const { id } = req.params;
   const { name, email, password } = req.body;
 
@@ -267,7 +276,10 @@ router.put('/admins/:id', authenticateAdmin, (req: Request, res: Response) => {
   res.json({ id: admins[index].id, name: admins[index].name, email: admins[index].email });
 });
 
-router.delete('/admins/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/admins/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
+  if (req.admin?.id !== 'admin-1') {
+    return res.status(403).json({ error: 'Access denied. Only the primary admin can manage admin accounts.' });
+  }
   const { id } = req.params;
   if (id === 'admin-1') {
     return res.status(400).json({ error: 'Primary super admin account cannot be deleted.' });

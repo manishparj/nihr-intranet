@@ -769,6 +769,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           message.success('YP/Consultant registered.');
         }
       } else if (type === 'admin') {
+        if (currentAdmin?.id !== 'admin-1') {
+          message.error('Unauthorized. Only Primary Admin can modify admin accounts.');
+          return;
+        }
         if (editRecord) {
           await apiService.updateAdmin(editRecord.id, values);
           message.success('Super admin account updated.');
@@ -821,7 +825,13 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       else if (type === 'pstaff') await apiService.deleteProjectStaff(id);
       else if (type === 'perm') await apiService.deletePermanentStaff(id);
       else if (type === 'ypc') await apiService.deleteYPConsultant(id);
-      else if (type === 'admin') await apiService.deleteAdmin(id);
+      else if (type === 'admin') {
+        if (currentAdmin?.id !== 'admin-1') {
+          message.error('Unauthorized. Only Primary Admin can delete admin accounts.');
+          return;
+        }
+        await apiService.deleteAdmin(id);
+      }
       else if (type === 'circular') await apiService.deleteCircular(id);
       else if (type === 'form') await apiService.deleteForm(id);
       else if (type === 'announcement') await apiService.deleteAnnouncement(id);
@@ -1387,6 +1397,24 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     if (currentKey === 'admin-salaries') {
       return (
         <AdminSalariesManager projectStaff={projectStaff} />
+      );
+    }
+
+    // Guard for Super Admin Accounts Management (Only admin-1 is allowed)
+    if (currentKey === 'admin-accounts' && currentAdmin?.id !== 'admin-1') {
+      return (
+        <div className="max-w-xl mx-auto my-12">
+          <Card className="shadow-sm rounded-xl text-center py-12 border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-zinc-100 mb-2">Access Denied</h2>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto mb-6 px-4">
+              The Super Admin Accounts Management panel is restricted to the Primary Admin only. You do not have permission to view or modify super admin credentials.
+            </p>
+            <Button type="primary" onClick={() => setCurrentKey('admin-dashboard')} className="rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 border-0 h-8">
+              Back to Dashboard
+            </Button>
+          </Card>
+        </div>
       );
     }
 
