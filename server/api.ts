@@ -505,6 +505,102 @@ router.delete('/project-staff/:id', authenticateAdmin, (req: Request, res: Respo
 
 
 // ==========================================
+// PENDING PROJECT STAFF SELF-REGISTRATION ENDPOINTS
+// ==========================================
+router.get('/pending-project-staff', authenticateAdmin, (req: Request, res: Response) => {
+  res.json(Database.get('pendingProjectStaff') || []);
+});
+
+router.post('/pending-project-staff', (req: Request, res: Response) => {
+  const pending = Database.get('pendingProjectStaff') || [];
+  
+  let body = processProfilePhoto(req.body);
+  const newPending: any = {
+    ...body,
+    id: `pending-${Date.now()}`,
+    status: 'Active', // Default status once approved
+    previousIcmrExperience: body.previousIcmrExperience || [],
+    previousNonIcmrExperience: body.previousNonIcmrExperience || [],
+  };
+
+  pending.push(newPending);
+  Database.set('pendingProjectStaff', pending);
+  res.status(201).json(newPending);
+});
+
+router.post('/pending-project-staff/:id/approve', authenticateAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const pending = Database.get('pendingProjectStaff') || [];
+  const pendingRecord = pending.find(p => p.id === id);
+
+  if (!pendingRecord) {
+    return res.status(404).json({ error: 'Pending registration not found' });
+  }
+
+  const staff = Database.get('projectStaff');
+
+  // Generate TEMP employee code
+  // Find highest TEMP number
+  const tempCodes = staff
+    .map(s => s.employeeCode)
+    .filter(code => code && code.startsWith('TEMP-'))
+    .map(code => parseInt(code.split('-')[1], 10))
+    .filter(num => !isNaN(num));
+  const highestNum = tempCodes.length > 0 ? Math.max(...tempCodes) : 999;
+  const employeeCode = `TEMP-${highestNum + 1}`;
+
+  const activeStaff: ProjectStaff = {
+    ...pendingRecord,
+    id: `pstaff-${Date.now()}`, // new active id
+    employeeCode,
+    status: 'Active' as 'Active' | 'Left',
+    noDuesCleared: false
+  };
+
+  staff.push(activeStaff);
+  Database.set('projectStaff', staff);
+
+  // Remove from pending
+  const remainingPending = pending.filter(p => p.id !== id);
+  Database.set('pendingProjectStaff', remainingPending);
+
+  res.json({ success: true, approvedRecord: activeStaff });
+});
+
+router.post('/pending-project-staff/:id/reject', authenticateAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const pending = Database.get('pendingProjectStaff') || [];
+  const remainingPending = pending.filter(p => p.id !== id);
+  Database.set('pendingProjectStaff', remainingPending);
+  res.json({ success: true });
+});
+
+// ==========================================
+// DATABASE FULL SECURITY BACKUP ENDPOINT
+// ==========================================
+router.get('/backup', authenticateAdmin, (req: Request, res: Response) => {
+  try {
+    const mainDb = Database.load();
+    
+    // Also try to read complaints.json if it exists
+    let complaintsDb = null;
+    const complaintsFile = path.join(process.cwd(), 'data', 'complaints.json');
+    if (fs.existsSync(complaintsFile)) {
+      complaintsDb = JSON.parse(fs.readFileSync(complaintsFile, 'utf8'));
+    }
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      mainDb,
+      complaintsDb
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to generate database backup', details: error.message });
+  }
+});
+
+
+// ==========================================
 // PERMANENT STAFF ENDPOINTS (CRUD)
 // ==========================================
 router.get('/permanent-staff', (req: Request, res: Response) => {

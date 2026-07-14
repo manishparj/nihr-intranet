@@ -90,6 +90,13 @@ export interface ProjectStaff {
   employeeCode: string; // TEMP-1000, etc.
   previousIcmrExperience: ExperienceEntry[];
   previousNonIcmrExperience: ExperienceEntry[];
+  motherName?: string;
+  motherPhone?: string;
+  fatherName?: string;
+  fatherPhone?: string;
+  maritalStatus?: 'Single' | 'Married' | 'Divorced' | 'Widowed';
+  spouseName?: string;
+  spousePhone?: string;
   // Enriched
   icmrExpMonths?: number;
   nonIcmrExpMonths?: number;
