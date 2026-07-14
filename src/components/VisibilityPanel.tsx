@@ -59,7 +59,7 @@ export const VisibilityPanel: React.FC<VisibilityPanelProps> = ({
       className="shadow-sm rounded-xl"
     >
       <Alert
-        message="Configure Public Dashboard Settings"
+        title="Configure Public Dashboard Settings"
         description="Control which modules are rendered for public guests, and restrict sensitive personal fields (such as Bank Details, Aadhaar, PAN) from public lookup tables."
         type="info"
         showIcon

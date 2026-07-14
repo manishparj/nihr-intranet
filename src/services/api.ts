@@ -286,6 +286,15 @@ export const apiService = {
     });
     return res.data;
   },
+  deleteComplaint: async (id: string) => {
+    const token = localStorage.getItem('complaint_su_token');
+    const res = await client.delete(`/complaints/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    return res.data;
+  },
 
   // Salary Slips System
   getSalaries: async () => {
@@ -302,6 +311,14 @@ export const apiService = {
   },
   deleteSalarySlip: async (id: string) => {
     const res = await client.delete<{ success: boolean; message: string }>(`/salaries/${id}`);
+    return res.data;
+  },
+  createSalarySlip: async (data: any) => {
+    const res = await client.post<{ success: boolean; salarySlip: SalarySlip }>('/salaries', data);
+    return res.data;
+  },
+  updateSalarySlip: async (id: string, data: any) => {
+    const res = await client.put<{ success: boolean; salarySlip: SalarySlip }>(`/salaries/${id}`, data);
     return res.data;
   }
 };

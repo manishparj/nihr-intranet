@@ -230,7 +230,7 @@ export interface Complaint {
   locationRoom: string;
   department: string;
   complaintDescriptionFull: string;
-  typeOfComplaint: 'IT' | 'Maintenance' | 'Admin';
+  typeOfComplaint: 'IT' | 'Maintenance';
   photoDocument?: string; // Base64 or saved path
   photoName?: string;
   assignedStaff?: string;
@@ -246,7 +246,7 @@ export interface ComplaintSuperUser {
   id: string;
   name: string;
   email: string;
-  department: 'IT' | 'Maintenance' | 'Admin';
+  department: 'IT' | 'Maintenance';
 }
 
 export interface SalarySlip {

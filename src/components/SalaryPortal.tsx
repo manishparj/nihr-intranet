@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Card, Button, Select, Input, Row, Col, Table,
-  message, Tag, Empty, Popconfirm, Alert
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Card, Button, Select, Input, Row, Col, Space, Table, 
+  message, Tag, Divider, Empty, Popconfirm, Form, Badge, Alert, Modal
 } from 'antd';
-import {
-  DownloadOutlined, PrinterOutlined, DeleteOutlined,
+import { 
+  UserOutlined, DownloadOutlined, PrinterOutlined, DeleteOutlined, 
   SearchOutlined, LockOutlined, IdcardOutlined, PhoneOutlined,
-  UploadOutlined, CheckCircleOutlined
+  CalendarOutlined, UploadOutlined, FileTextOutlined, CheckCircleOutlined,
+  EditOutlined, PlusOutlined
 } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import { SalarySlip } from '../types';
@@ -14,39 +15,11 @@ import { SalarySlip } from '../types';
 const { Option } = Select;
 
 const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
+  'January', 'February', 'March', 'April', 'May', 'June', 
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
 const YEARS = ['2025', '2026', '2027', '2028'];
-
-// ==========================================
-// Shared helpers
-// ==========================================
-const toNumber = (val: string) => parseFloat((val || '').replace(/[^0-9.]/g, '')) || 0;
-
-// A single compact "label over value" cell used across the slip
-const InfoCell: React.FC<{ label: string; value: React.ReactNode; span?: string }> = ({ label, value, span }) => (
-  <div className={span}>
-    <div className="text-[8.5px] font-bold uppercase tracking-wide text-slate-400 dark:text-zinc-500 leading-none">
-      {label}
-    </div>
-    <div className="text-[11px] font-bold text-slate-800 dark:text-zinc-200 leading-tight mt-0.5 truncate">
-      {value}
-    </div>
-  </div>
-);
-
-const SectionLabel: React.FC<{ n: number; title: string }> = ({ n, title }) => (
-  <div className="flex items-center gap-1.5 mb-1.5 mt-3 first:mt-0">
-    <span className="w-4 h-4 rounded-full bg-[#005EB8] text-white text-[8px] font-black flex items-center justify-center shrink-0">
-      {n}
-    </span>
-    <span className="text-[9.5px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
-      {title}
-    </span>
-  </div>
-);
 
 // ==========================================
 // 1. PUBLIC STAFF SALARY PORTAL VIEW
@@ -64,7 +37,7 @@ export const SalaryPortalView: React.FC = () => {
       message.error('Please fill in both Mobile and Aadhaar card numbers.');
       return;
     }
-
+    
     setLoading(true);
     try {
       const res = await apiService.loginSalaryPortal({
@@ -88,164 +61,533 @@ export const SalaryPortalView: React.FC = () => {
     }
   };
 
-  const handlePrintSlip = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow || !activeSlip) {
-      message.error('Failed to open printing target. Please allow popups.');
-      return;
-    }
-
+  // Shared table-based HTML used for both download and print, so the two
+  // outputs always stay visually identical and both scale down cleanly.
+const buildSlipHTML = (activeSlip: SalarySlip, forPrint: boolean) => {
     const details = activeSlip.details || {};
     const getVal = (k: string) => details[k] || '-';
-    const taxNum = toNumber(getVal('Income Tax Deduction'));
-    const lwpDedNum = toNumber(getVal('Leave Without Pay Deduction'));
+    const taxNum = parseFloat(getVal('Income Tax Deduction').replace(/[^0-9.]/g, '')) || 0;
+    const lwpDedNum = parseFloat(getVal('Leave Without Pay Deduction').replace(/[^0-9.]/g, '')) || 0;
     const totalDed = taxNum + lwpDedNum;
 
-    printWindow.document.write(`
+    return `
+      <!DOCTYPE html>
       <html>
       <head>
-        <title>Salary Slip - ${activeSlip.name}</title>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>REMUNERATION STATEMENT - ${activeSlip.name} - ${activeSlip.month} ${activeSlip.year}</title>
         <style>
-          @page { size: A4; margin: 12mm; }
-          * { box-sizing: border-box; }
-          body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #1a202c; font-size: 12px; }
-          .container { border: 1px solid #cbd5e1; border-radius: 6px; padding: 16px 20px; max-width: 760px; margin: 0 auto; }
-          .header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; border-bottom: 2px solid #005EB8; padding-bottom: 10px; }
-          .header img { height: 36px; }
-          .header h2 { margin: 0; color: #005EB8; font-size: 15px; }
-          .header p { margin: 2px 0 0 0; font-size: 9.5px; color: #64748b; letter-spacing: .3px; }
-          h4.sec { margin: 10px 0 4px 0; font-size: 9.5px; text-transform: uppercase; color: #64748b; letter-spacing: .4px; font-weight: 700; }
-          .meta-section { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 12px; margin-bottom: 8px; background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; }
-          .meta-section.wide-first { grid-template-columns: 2fr 1fr; }
-          .meta-item .label { font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; letter-spacing: .3px; }
-          .meta-item .val { font-size: 10.5px; font-weight: 700; color: #1e293b; }
-          table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-          th { background: #f1f5f9; color: #475569; padding: 5px; font-size: 8.5px; border: 1px solid #cbd5e1; text-transform: uppercase; }
-          td { padding: 6px 6px; border: 1px solid #cbd5e1; font-size: 10.5px; }
-          .flex-row { display: flex; gap: 12px; margin-top: 8px; }
-          .col { width: 50%; }
-          .total { background: #f8fafc; font-weight: bold; }
-          .net-banner { background: #005EB8; color: white; padding: 10px; border-radius: 6px; text-align: center; margin-top: 14px; font-size: 15px; font-weight: 800; letter-spacing: .3px; }
-          .foot { text-align: center; font-size: 8px; color: #94a3b8; margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { 
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif; 
+            margin: 0; 
+            padding: 12px; 
+            background: #f0f2f5; 
+            color: #1a2332; 
+            font-size: 11px;
+            line-height: 1.5;
+          }
+          .sheet { 
+            max-width: 850px; 
+            margin: 0 auto; 
+            background: #ffffff; 
+            border: 1px solid #d1d5db; 
+            border-radius: 6px; 
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+          }
+          
+          /* Header */
+          .header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            border-bottom: 2.5px solid #1a5fb4;
+            background: #f8faff;
+          }
+          .header img { height: 38px; width: auto; }
+          .header .org-name { 
+            font-size: 15px; 
+            font-weight: 800; 
+            color: #1a5fb4; 
+            margin: 0; 
+            letter-spacing: 0.3px;
+          }
+          .header .org-sub { 
+            font-size: 9px; 
+            font-weight: 600; 
+            color: #5e6f8d; 
+            letter-spacing: 0.5px; 
+            text-transform: uppercase;
+          }
+          .title-bar {
+            background: #f0f4f8;
+            padding: 6px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #1a2332;
+            border-bottom: 1px solid #e2e8f0;
+          }
+
+          /* Content */
+          .content { padding: 14px 18px 8px; }
+
+          /* Staff & Bank Combined - Two Column Layout */
+          .info-grid {
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+          }
+          .info-grid-inner {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+          }
+          .info-col {
+            padding: 8px 14px;
+          }
+          .info-col:first-child {
+            border-right: 1px solid #e2e8f0;
+          }
+          .info-row {
+            display: flex;
+            padding: 4px 0;
+            border-bottom: 1px solid #f1f5f9;
+          }
+          .info-row:last-child {
+            border-bottom: none;
+          }
+          .info-row .label {
+            width: 35%;
+            font-weight: 700;
+            color: #5e6f8d;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
+          }
+          .info-row .value {
+            width: 65%;
+            font-weight: 600;
+            color: #0f172a;
+            font-size: 10.5px;
+            word-break: break-word;
+          }
+          .info-col .col-title {
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #1a5fb4;
+            padding: 4px 0 3px;
+            border-bottom: 2px solid #1a5fb4;
+            margin-bottom: 5px;
+          }
+          .info-col .col-title.gray {
+            color: #475569;
+            border-bottom-color: #475569;
+          }
+
+          /* Leave Table */
+          .leave-wrap {
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+          }
+          .leave-wrap .table-title {
+            background: #f0f4f8;
+            padding: 5px 12px;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #475569;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .leave-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10.5px;
+          }
+          .leave-table th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 800;
+            font-size: 8.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 6px 8px;
+            border-bottom: 1.5px solid #e2e8f0;
+            text-align: center;
+          }
+          .leave-table td {
+            padding: 7px 8px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 10.5px;
+            border-bottom: 1px solid #f1f5f9;
+          }
+          .leave-table tr:last-child td {
+            border-bottom: none;
+          }
+
+          /* Salary Row - 3 columns */
+          .salary-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+          }
+          .salary-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+          }
+          .salary-box .box-title {
+            padding: 5px 12px;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+            text-align: center;
+          }
+          .salary-box .box-title.earn { background: #1a5fb4; }
+          .salary-box .box-title.ded { background: #475569; }
+          .salary-box .box-title.net { background: #0d9488; }
+
+          .salary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 10.5px;
+          }
+          .salary-item:last-child {
+            border-bottom: none;
+          }
+          .salary-item .s-label {
+            font-weight: 600;
+            color: #334155;
+          }
+          .salary-item .s-value {
+            font-weight: 700;
+            color: #0f172a;
+          }
+          .salary-item.total {
+            background: #f8fafc;
+            font-weight: 800;
+            border-top: 2px solid #d1d5db;
+          }
+          .salary-item.total .s-value.gross {
+            color: #1a5fb4;
+            font-size: 11.5px;
+          }
+          .salary-item.total .s-value.ded {
+            color: #dc2626;
+            font-size: 11.5px;
+          }
+          .salary-item.net-row {
+            background: #0d9488;
+            padding: 8px 12px;
+            border-bottom: none;
+          }
+          .salary-item.net-row .s-label {
+            color: #ffffff;
+            font-size: 10.5px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+          }
+          .salary-item.net-row .s-value {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 900;
+          }
+
+          /* Important Box */
+          .important-box {
+            border: 2px solid #dc2626;
+            border-radius: 4px;
+            padding: 10px 14px;
+            background: #fefaf9;
+            margin: 0 0 6px 0;
+          }
+          .important-box .imp-title {
+            font-size: 10px;
+            font-weight: 900;
+            color: #dc2626;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+          }
+          .important-box p {
+            font-size: 9px;
+            line-height: 1.6;
+            color: #1e293b;
+            margin: 0 0 4px 0;
+          }
+          .important-box p:last-child {
+            margin-bottom: 0;
+          }
+          .important-box .hl {
+            color: #dc2626;
+            font-weight: 700;
+          }
+
+          /* Footer */
+          .footer {
+            text-align: center;
+            font-size: 8.5px;
+            color: #94a3b8;
+            padding: 8px 18px 12px;
+            border-top: 1px solid #f1f5f9;
+          }
+          .footer .contact {
+            font-size: 9.5px;
+            color: #5e6f8d;
+            font-weight: 600;
+            margin: 3px 0;
+          }
+          .footer .contact a {
+            color: #1a5fb4;
+            text-decoration: none;
+          }
+
+          /* Print Styles */
+          @media print {
+            body { 
+              background: #fff; 
+              padding: 6px; 
+              font-size: 10px;
+            }
+            .sheet { 
+              border: none; 
+              border-radius: 0; 
+              max-width: 100%; 
+              box-shadow: none;
+              margin: 0;
+            }
+            .header { padding: 8px 16px; }
+            .header img { height: 32px; }
+            .header .org-name { font-size: 13px; }
+            .content { padding: 10px 14px 6px; }
+            .info-col { padding: 6px 12px; }
+            .info-col:first-child {
+              border-right: 1px solid #e2e8f0;
+            }
+            .info-row { padding: 3px 0; }
+            .info-row .label { font-size: 8px; }
+            .info-row .value { font-size: 9.5px; }
+            .info-col .col-title { font-size: 8px; padding: 3px 0; }
+            .leave-table th { font-size: 7.5px; padding: 5px 6px; }
+            .leave-table td { font-size: 9.5px; padding: 5px 6px; }
+            .salary-item { font-size: 9.5px; padding: 4px 10px; }
+            .salary-item.total .s-value.gross { font-size: 10.5px; }
+            .salary-item.total .s-value.ded { font-size: 10.5px; }
+            .salary-item.net-row { padding: 6px 10px; }
+            .salary-item.net-row .s-label { font-size: 9.5px; }
+            .salary-item.net-row .s-value { font-size: 14px; }
+            .salary-box .box-title { font-size: 8px; padding: 4px 10px; }
+            .important-box { padding: 8px 12px; }
+            .important-box .imp-title { font-size: 9px; }
+            .important-box p { font-size: 8px; line-height: 1.5; margin-bottom: 3px; }
+            .footer { font-size: 7.5px; padding: 6px 14px 8px; }
+            .footer .contact { font-size: 8.5px; }
+            .title-bar { font-size: 10px; padding: 5px; }
+            .salary-row { gap: 8px; }
+            .info-grid { margin-bottom: 8px; }
+            .leave-wrap { margin-bottom: 8px; }
+            .salary-row { margin-bottom: 8px; }
+            
+            /* Ensure colors print */
+            .salary-box .box-title.earn { background: #1a5fb4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .salary-box .box-title.ded { background: #475569 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .salary-box .box-title.net { background: #0d9488 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .salary-item.net-row { background: #0d9488 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
+
+          /* Responsive */
+          @media (max-width: 640px) {
+            body { padding: 6px; font-size: 10px; }
+            .header { padding: 8px 12px; flex-wrap: wrap; }
+            .header img { height: 28px; }
+            .header .org-name { font-size: 12px; }
+            .content { padding: 8px 10px 4px; }
+            .info-grid-inner {
+              grid-template-columns: 1fr;
+            }
+            .info-col:first-child {
+              border-right: none;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            .salary-row { grid-template-columns: 1fr; gap: 6px; }
+            .info-row .label { width: 40%; }
+            .info-row .value { width: 60%; }
+            .salary-item.net-row .s-value { font-size: 14px; }
+            .important-box p { font-size: 8.5px; }
+          }
         </style>
       </head>
       <body>
-        <div class="container">
+        <div class="sheet">
+          <!-- Header -->
           <div class="header">
-            <img src="https://niirncd.icmr.org.in/assets/img/logo/nihrlogo.png" alt="Logo" />
+            <img src="https://niirncd.icmr.org.in/assets/img/logo/nihrlogo.png" alt="ICMR Logo" />
             <div>
-              <h2>National Institute for Health Research</h2>
-              <p>OFFICIAL SALARY SLIP STATEMENT — ${activeSlip.month} ${activeSlip.year}</p>
+              <div class="org-name">ICMR-National Institute for Health Research, Jodhpur</div>
+              <div class="org-sub">Ministry of Health & Family Welfare, Government of India</div>
             </div>
           </div>
+          <div class="title-bar">Remuneration Statement &mdash; ${activeSlip.month} ${activeSlip.year}</div>
 
-          <h4 class="sec">1. Staff Appointment Details</h4>
-          <div class="meta-section">
-            <div class="meta-item"><span class="label">Employee Name</span><span class="val">${getVal('Employee Name')}</span></div>
-            <div class="meta-item"><span class="label">Employee Code</span><span class="val">${getVal('Employee Code')}</span></div>
-            <div class="meta-item"><span class="label">Designation</span><span class="val">${getVal('Designation')}</span></div>
-            <div class="meta-item"><span class="label">Aadhaar (Masked)</span><span class="val">XXXX-XXXX-${activeSlip.aadhaarNumber.slice(-4)}</span></div>
-            <div class="meta-item"><span class="label">Date of Joining</span><span class="val">${getVal('Date of Joining')}</span></div>
-            <div class="meta-item"><span class="label">Tenure Up To</span><span class="val">${getVal('Tenure Up To')}</span></div>
-          </div>
+          <div class="content">
+            <!-- Staff & Bank Details - Two Column Layout -->
+            <div class="info-grid">
+              <div class="info-grid-inner">
+                <!-- Left Column: Staff Details -->
+                <div class="info-col">
+                  <div class="col-title">Staff Details</div>
+                  <div class="info-row"><span class="label">Employee Name</span><span class="value">${getVal('Employee Name')}</span></div>
+                  <div class="info-row"><span class="label">Employee Code</span><span class="value">${getVal('Employee Code')}</span></div>
+                  <div class="info-row"><span class="label">Designation</span><span class="value">${getVal('Designation')}</span></div>
+                  <div class="info-row"><span class="label">Date of Joining</span><span class="value">${getVal('Date of Joining')}</span></div>
+                  <div class="info-row"><span class="label">Tenure Up To</span><span class="value">${getVal('Tenure Up To')}</span></div>
+                  <div class="info-row"><span class="label">Employment Status</span><span class="value">Purely Temporary / Project Staff (Co-terminus with the Project)</span></div>
+                  <div class="info-row"><span class="label">Aadhaar (Masked)</span><span class="value">XXXX-XXXX-${activeSlip.aadhaarNumber.slice(-4)}</span></div>
+                  <div class="info-row"><span class="label">Project Name</span><span class="value">${getVal('Project Name')}</span></div>
+                  <div class="info-row"><span class="label">Principal Investigator</span><span class="value">${getVal('Scientist Name')}</span></div>
+                  <div class="info-row"><span class="label">PI Designation</span><span class="value">${getVal('Scientist Designation')}</span></div>
+                </div>
+                
+                <!-- Right Column: Bank Details -->
+                <div class="info-col">
+                  <div class="col-title gray">Bank Details</div>
+                  <div class="info-row"><span class="label">Bank Name</span><span class="value">${getVal('Bank Name')}</span></div>
+                  <div class="info-row"><span class="label">Account Number</span><span class="value">${getVal('Account Number')}</span></div>
+                  <div class="info-row"><span class="label">IFSC Code</span><span class="value">${getVal('IFSC Code')}</span></div>
+                  <div class="info-row"><span class="label">PAN Number</span><span class="value">${getVal('PAN Number')}</span></div>
+                </div>
+              </div>
+            </div>
 
-          <h4 class="sec">2. Project Reference &amp; Supervisor</h4>
-          <div class="meta-section wide-first">
-            <div class="meta-item"><span class="label">Project Name</span><span class="val">${getVal('Project Name')}</span></div>
-            <div class="meta-item"><span class="label">PI / Supervisor</span><span class="val">${getVal('Scientist Name')} (${getVal('Scientist Designation')})</span></div>
-          </div>
-
-          <h4 class="sec">3. Bank Account Details</h4>
-          <div class="meta-section">
-            <div class="meta-item"><span class="label">Bank Name</span><span class="val">${getVal('Bank Name')}</span></div>
-            <div class="meta-item"><span class="label">Account Number</span><span class="val">${getVal('Account Number')}</span></div>
-            <div class="meta-item"><span class="label">IFSC Code</span><span class="val">${getVal('IFSC Code')}</span></div>
-            <div class="meta-item"><span class="label">PAN Number</span><span class="val">${getVal('PAN Number')}</span></div>
-          </div>
-
-          <h4 class="sec">4. Leaves &amp; Attendance Summary</h4>
-          <table>
-            <thead>
-              <tr>
-                <th>Days in Month</th><th>Present</th><th>B/F Leave</th><th>Leave Credit</th>
-                <th>Total Leave</th><th>Availed</th><th>Balance</th><th>LWP Days</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style="text-align:center;">
-                <td>${getVal('Days in Month')}</td>
-                <td>${getVal('Total Present Days')}</td>
-                <td>${getVal('Balance Leave Brought')}</td>
-                <td>${getVal('Leave Credit')}</td>
-                <td>${getVal('Total Leave')}</td>
-                <td>${getVal('Leave Availed')}</td>
-                <td>${getVal('Leave Balance')}</td>
-                <td>${getVal('Leave Without Pay')}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div class="flex-row">
-            <div class="col">
-              <h4 class="sec" style="margin-top:0;">Earnings</h4>
-              <table>
-                <thead><tr><th style="text-align:left;">Category</th><th style="text-align:right;">Amount</th></tr></thead>
+            <!-- Leave Details -->
+            <div class="leave-wrap">
+              <div class="table-title">Leave Details</div>
+              <table class="leave-table">
+                <thead>
+                  <tr>
+                    <th>Month Days</th>
+                    <th>Present</th>
+                    <th>B/F Leave</th>
+                    <th>Leave Credit</th>
+                    <th>Total Leave</th>
+                    <th>Availed</th>
+                    <th>Balance</th>
+                    <th>LWP Days</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  <tr><td>Basic Pay</td><td style="text-align:right;">${getVal('Basic Pay')}</td></tr>
-                  <tr><td>HRA Allowance</td><td style="text-align:right;">${getVal('HRA')}</td></tr>
-                  <tr class="total"><td>Gross Remuneration</td><td style="text-align:right;">${getVal('Gross Remuneration')}</td></tr>
+                  <tr>
+                    <td>${getVal('Days in Month')}</td>
+                    <td>${getVal('Total Present Days')}</td>
+                    <td>${getVal('Balance Leave Brought')}</td>
+                    <td>${getVal('Leave Credit')}</td>
+                    <td>${getVal('Total Leave')}</td>
+                    <td>${getVal('Leave Availed')}</td>
+                    <td>${getVal('Leave Balance')}</td>
+                    <td>${getVal('Leave Without Pay')}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
-            <div class="col">
-              <h4 class="sec" style="margin-top:0;">Deductions</h4>
-              <table>
-                <thead><tr><th style="text-align:left;">Category</th><th style="text-align:right;">Amount</th></tr></thead>
-                <tbody>
-                  <tr><td>Income Tax (TDS)</td><td style="text-align:right;">${getVal('Income Tax Deduction')}</td></tr>
-                  <tr><td>Leave Without Pay</td><td style="text-align:right;">${getVal('Leave Without Pay Deduction')}</td></tr>
-                  <tr class="total"><td>Total Deductions</td><td style="text-align:right;">₹${totalDed.toLocaleString('en-IN')}</td></tr>
-                </tbody>
-              </table>
+
+            <!-- Earnings, Deductions & Net Pay -->
+            <div class="salary-row">
+              <div class="salary-box">
+                <div class="box-title earn">Earnings</div>
+                <div class="salary-item"><span class="s-label">Consolidated Remuneration</span><span class="s-value">${getVal('Basic Pay')}</span></div>
+                <div class="salary-item"><span class="s-label">HRA Allowance</span><span class="s-value">${getVal('HRA')}</span></div>
+                <div class="salary-item total"><span class="s-label">Gross Remuneration</span><span class="s-value gross">${getVal('Gross Remuneration')}</span></div>
+              </div>
+
+              <div class="salary-box">
+                <div class="box-title ded">Deductions</div>
+                <div class="salary-item"><span class="s-label">Income Tax (TDS)</span><span class="s-value">${getVal('Income Tax Deduction')}</span></div>
+                <div class="salary-item"><span class="s-label">Leave Without Pay</span><span class="s-value">${getVal('Leave Without Pay Deduction')}</span></div>
+                <div class="salary-item total"><span class="s-label">Total Deductions</span><span class="s-value ded">₹${totalDed.toLocaleString('en-IN')}</span></div>
+              </div>
+
+              <div class="salary-box">
+                <div class="box-title net">Net Pay</div>
+                <div class="salary-item net-row">
+                  <span class="s-label">Take-home Amount</span>
+                  <span class="s-value">${getVal('Net Pay')}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Important Instructions -->
+            <div class="important-box">
+              <div class="imp-title">⚠️ Important Instructions &amp; Disclaimers</div>
+              <p><strong>1. Employment Status:</strong> This is a <span class="hl">purely temporary/contractual</span> engagement under a time-bound research project. The employee has <span class="hl">no claim</span> for regular appointment, absorption, continuation of service, pension, or any other benefits beyond the terms of the appointment.</p>
+              <p><strong>2. Document Purpose:</strong> This computer-generated remuneration statement is issued <span class="hl">only for information and record purposes</span>. It does not require a physical signature.</p>
+              <p><strong>3. Non-Transferability:</strong> This statement shall <span class="hl">not be construed</span> as proof of permanent Government employment or guarantee of future employment.</p>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+              <div class="contact">ICMR&ndash;National Institute for Health Research, Jodhpur</div>
+              <div class="contact">Website: <a href="https://niirncd.icmr.org.in/">https://niirncd.icmr.org.in/</a> &nbsp;|&nbsp; Email: <a href="mailto:director-niirncd@icmr.gov.in">director-niirncd@icmr.gov.in</a></div>
+              <div style="margin-top: 3px;">System-generated document &bull; Valid without signature</div>
             </div>
           </div>
-
-          <div class="net-banner">NET TAKE-HOME REMUNERATION &nbsp; ${getVal('Net Pay')}</div>
-          <p class="foot">This is a dynamically generated statement. No hand-drawn signature is required.</p>
         </div>
-        <script>window.onload = function () { window.print(); };</script>
+        ${forPrint ? '<script>window.onload = function(){ window.print(); };</script>' : ''}
       </body>
       </html>
-    `);
+    `;
+  };
+
+  const handlePrintSlip = () => {
+    if (!activeSlip) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      message.error('Failed to open printing target. Please allow popups.');
+      return;
+    }
+    printWindow.document.write(buildSlipHTML(activeSlip, true));
     printWindow.document.close();
   };
 
   const details = activeSlip?.details || {};
   const getVal = (k: string) => details[k] || '-';
-  const taxNum = toNumber(getVal('Income Tax Deduction'));
-  const lwpDedNum = toNumber(getVal('Leave Without Pay Deduction'));
+  const taxNum = parseFloat(getVal('Income Tax Deduction').replace(/[^0-9.]/g, '')) || 0;
+  const lwpDedNum = parseFloat(getVal('Leave Without Pay Deduction').replace(/[^0-9.]/g, '')) || 0;
   const totalDed = taxNum + lwpDedNum;
 
   return (
-    <div className="max-w-4xl mx-auto p-3 sm:p-4 md:p-6 animate-fadeIn">
+    <div className="max-w-4xl mx-auto p-2 md:p-6 animate-fadeIn">
       {!activeSlip ? (
-        <Card
+        <Card 
           className="shadow-md rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
           title={
             <div className="text-center py-2">
-              <span className="block text-[10px] sm:text-[11px] text-blue-500 font-extrabold uppercase tracking-widest">
-                🔒 Central Staff Payroll
-              </span>
-              <span className="text-sm sm:text-base font-black text-slate-800 dark:text-zinc-100">
-                Project Staff Salary Slips Access Portal
-              </span>
+              <span className="block text-[11px] text-blue-500 font-extrabold uppercase tracking-widest">🔒 Central Staff Payroll</span>
+              <span className="text-base font-black text-slate-800 dark:text-zinc-100">Project Staff Salary Slips Access Portal</span>
             </div>
           }
         >
-          <div className="space-y-4 max-w-md mx-auto py-2 sm:py-4">
-            <Alert
-              message="Secure Authentication Required"
-              description="Enter your registered mobile number and Aadhaar card number to view your monthly salary payslip."
+          <div className="space-y-4 max-w-md mx-auto py-4">
+            <Alert 
+              title="Secure Authentication Required"
+              description="Please provide your registered mobile number and Aadhaar card number to look up and view your monthly salary payslip statement."
               type="info"
               showIcon
               className="rounded-lg text-xs"
@@ -253,223 +595,75 @@ export const SalaryPortalView: React.FC = () => {
 
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1">Registered Mobile Number</label>
-              <Input
+              <Input 
                 prefix={<PhoneOutlined className="text-slate-400" />}
-                placeholder="e.g. 9876543210"
-                value={mobile}
+                placeholder="e.g. 9876543210" 
+                value={mobile} 
                 onChange={(e) => setMobile(e.target.value.replace(/[^0-9]/g, ''))}
                 maxLength={10}
                 className="rounded-lg h-10"
-                inputMode="numeric"
               />
             </div>
 
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1">Aadhaar Card Number (12 Digits)</label>
-              <Input
+              <Input 
                 prefix={<IdcardOutlined className="text-slate-400" />}
-                placeholder="e.g. 123456789012"
-                value={aadhaar}
+                placeholder="e.g. 123456789012" 
+                value={aadhaar} 
                 onChange={(e) => setAadhaar(e.target.value.replace(/[^0-9]/g, ''))}
                 maxLength={12}
                 className="rounded-lg h-10"
-                inputMode="numeric"
               />
             </div>
 
             <Row gutter={12}>
-              <Col xs={12}>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Payslip Month</label>
-                <Select value={month} onChange={setMonth} className="w-full" style={{ height: 40 }}>
-                  {MONTHS.map(m => <Option key={m} value={m}>{m}</Option>)}
+              <Col span={12}>
+                <label className="text-xs font-bold text-slate-500 block mb-1">Select Payslip Month</label>
+                <Select value={month} onChange={setMonth} className="w-full h-10 rounded-lg">
+                  {MONTHS.map(m => (
+                    <Option key={m} value={m}>{m}</Option>
+                  ))}
                 </Select>
               </Col>
-              <Col xs={12}>
-                <label className="text-xs font-bold text-slate-500 block mb-1">Year</label>
-                <Select value={year} onChange={setYear} className="w-full" style={{ height: 40 }}>
-                  {YEARS.map(y => <Option key={y} value={y}>{y}</Option>)}
+              <Col span={12}>
+                <label className="text-xs font-bold text-slate-500 block mb-1">Select Year</label>
+                <Select value={year} onChange={setYear} className="w-full h-10 rounded-lg">
+                  {YEARS.map(y => (
+                    <Option key={y} value={y}>{y}</Option>
+                  ))}
                 </Select>
               </Col>
             </Row>
 
-            <Button
-              type="primary"
-              block
+            <Button 
+              type="primary" 
+              block 
               loading={loading}
               onClick={handlePortalLogin}
               className="h-10 rounded-lg font-bold text-xs bg-[#005EB8] hover:bg-blue-700 mt-2"
               icon={<LockOutlined />}
             >
-              Verify Credentials &amp; Load Payslip
+              Verify Credentials & Load Payslip
             </Button>
           </div>
         </Card>
       ) : (
-        <div className="space-y-4">
-          <div className="flex flex-col xs:flex-row sm:flex-row justify-between items-start sm:items-center gap-2 bg-slate-100 dark:bg-zinc-800/50 p-2.5 rounded-lg">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-zinc-300">
-              ✔️ Authenticated as <strong className="text-blue-600 dark:text-blue-400">{activeSlip.name}</strong>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-slate-100 dark:bg-zinc-800/50 p-3 rounded-lg">
+            <span className="text-xs font-bold text-slate-600 dark:text-zinc-300">
+              ✔️ Authenticated successfully as <strong className="text-blue-600 dark:text-blue-400">{activeSlip.name}</strong>
             </span>
             <Button size="small" type="dashed" danger onClick={() => setActiveSlip(null)}>
-              Sign Out
+              Sign Out / Lock Portal
             </Button>
           </div>
-
-          {/* ===== Compact professional payslip card ===== */}
-          <Card
-            id="printable-salary-slip"
-            variant="outlined"
-            className="shadow-sm rounded-lg overflow-hidden border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-            styles={{ body: { padding: 0 } }}
-          >
-            <div className="p-3 sm:p-5">
-              {/* Header */}
-              <div className="flex items-center gap-3 border-b border-slate-200 dark:border-zinc-800 pb-3 mb-3">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#005EB8] rounded flex items-center justify-center p-1 overflow-hidden shrink-0">
-                  <img src="https://niirncd.icmr.org.in/assets/img/logo/nihrlogo.png" alt="Logo" className="w-full h-full object-contain" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-xs sm:text-sm font-black text-slate-800 dark:text-zinc-100 uppercase tracking-wide leading-tight truncate">
-                    National Institute for Health Research
-                  </h2>
-                  <span className="text-[9px] text-slate-400 dark:text-zinc-500 uppercase tracking-widest font-extrabold block">
-                    Official Payroll Statement &middot; {activeSlip.month} {activeSlip.year}
-                  </span>
-                </div>
-              </div>
-
-              {/* 1. Appointment */}
-              <SectionLabel n={1} title="Appointment & Staff Profile" />
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-3 gap-y-2 bg-slate-50 dark:bg-zinc-800/20 p-2.5 sm:p-3 rounded-lg border border-slate-100 dark:border-zinc-800/50">
-                <InfoCell label="Staff Name" value={getVal('Employee Name')} span="col-span-2 sm:col-span-1" />
-                <InfoCell label="Temp Code" value={getVal('Employee Code')} />
-                <InfoCell label="Designation" value={getVal('Designation')} />
-                <InfoCell label="Date of Joining" value={getVal('Date of Joining')} />
-                <InfoCell label="Tenure Up To" value={getVal('Tenure Up To')} />
-                <InfoCell label="Aadhaar (Masked)" value={`XXXX-XXXX-${activeSlip.aadhaarNumber.slice(-4)}`} />
-              </div>
-
-              {/* 2. Project */}
-              <SectionLabel n={2} title="Associated Project & PI Scientist" />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-3 gap-y-2 bg-slate-50 dark:bg-zinc-800/20 p-2.5 sm:p-3 rounded-lg border border-slate-100 dark:border-zinc-800/50">
-                <InfoCell label="Project Title" value={getVal('Project Name')} span="sm:col-span-2" />
-                <InfoCell
-                  label="Principal Investigator"
-                  value={<>{getVal('Scientist Name')} <span className="font-normal text-slate-400 dark:text-zinc-500">({getVal('Scientist Designation')})</span></>}
-                />
-              </div>
-
-              {/* 3. Bank */}
-              <SectionLabel n={3} title="Bank Account Details" />
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2 bg-slate-50 dark:bg-zinc-800/20 p-2.5 sm:p-3 rounded-lg border border-slate-100 dark:border-zinc-800/50">
-                <InfoCell label="Bank Name" value={getVal('Bank Name')} />
-                <InfoCell label="Account Number" value={getVal('Account Number')} />
-                <InfoCell label="IFSC Code" value={getVal('IFSC Code')} />
-                <InfoCell label="PAN Number" value={getVal('PAN Number')} />
-              </div>
-
-              {/* 4. Attendance */}
-              <SectionLabel n={4} title="Leaves & Attendance Summary" />
-              <div className="border border-slate-100 dark:border-zinc-800 rounded-lg overflow-x-auto bg-slate-50/30 dark:bg-zinc-800/10">
-                <table className="w-full text-center text-[10.5px] border-collapse min-w-[480px]">
-                  <thead>
-                    <tr className="bg-slate-100/70 dark:bg-zinc-800/50 text-slate-500 uppercase font-black text-[8px] border-b border-slate-100 dark:border-zinc-800">
-                      <th className="p-1.5">Month Days</th>
-                      <th className="p-1.5">Present</th>
-                      <th className="p-1.5">B/F Leave</th>
-                      <th className="p-1.5">Leave Credit</th>
-                      <th className="p-1.5">Total Leave</th>
-                      <th className="p-1.5">Availed</th>
-                      <th className="p-1.5">Balance</th>
-                      <th className="p-1.5 text-red-500">LWP Days</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-x divide-slate-100 dark:divide-zinc-800 font-bold text-slate-700 dark:text-zinc-300">
-                    <tr>
-                      <td className="p-1.5">{getVal('Days in Month')}</td>
-                      <td className="p-1.5 text-emerald-600 dark:text-emerald-400">{getVal('Total Present Days')}</td>
-                      <td className="p-1.5">{getVal('Balance Leave Brought')}</td>
-                      <td className="p-1.5">{getVal('Leave Credit')}</td>
-                      <td className="p-1.5">{getVal('Total Leave')}</td>
-                      <td className="p-1.5 text-amber-600">{getVal('Leave Availed')}</td>
-                      <td className="p-1.5 text-blue-600 dark:text-blue-400">{getVal('Leave Balance')}</td>
-                      <td className="p-1.5 text-red-600">{getVal('Leave Without Pay')}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Earnings / Deductions */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                <div className="border border-slate-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-                  <table className="w-full text-[11px]">
-                    <thead>
-                      <tr className="bg-[#005EB8] text-white uppercase text-[9px] font-black">
-                        <th className="p-2 text-left">Earnings</th>
-                        <th className="p-2 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
-                      <tr>
-                        <td className="p-2 font-semibold text-slate-700 dark:text-zinc-300">Basic Pay</td>
-                        <td className="p-2 text-right font-black text-slate-800 dark:text-zinc-200">{getVal('Basic Pay')}</td>
-                      </tr>
-                      <tr>
-                        <td className="p-2 font-semibold text-slate-700 dark:text-zinc-300">HRA Allowance</td>
-                        <td className="p-2 text-right font-black text-slate-800 dark:text-zinc-200">{getVal('HRA')}</td>
-                      </tr>
-                      <tr className="bg-slate-50 dark:bg-zinc-800/50 border-t-2 border-slate-200 dark:border-zinc-700">
-                        <td className="p-2 font-bold text-slate-900 dark:text-zinc-100">Gross Remuneration</td>
-                        <td className="p-2 text-right font-black text-[#005EB8] dark:text-blue-400 text-xs">{getVal('Gross Remuneration')}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="border border-slate-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-                  <table className="w-full text-[11px]">
-                    <thead>
-                      <tr className="bg-slate-700 dark:bg-zinc-800 text-white uppercase text-[9px] font-black">
-                        <th className="p-2 text-left">Deductions</th>
-                        <th className="p-2 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
-                      <tr>
-                        <td className="p-2 font-semibold text-slate-700 dark:text-zinc-300">Income Tax (TDS)</td>
-                        <td className="p-2 text-right font-black text-slate-800 dark:text-zinc-200">{getVal('Income Tax Deduction')}</td>
-                      </tr>
-                      <tr>
-                        <td className="p-2 font-semibold text-slate-700 dark:text-zinc-300">Leave Without Pay</td>
-                        <td className="p-2 text-right font-black text-slate-800 dark:text-zinc-200">{getVal('Leave Without Pay Deduction')}</td>
-                      </tr>
-                      <tr className="bg-slate-50 dark:bg-zinc-800/50 border-t-2 border-slate-200 dark:border-zinc-700">
-                        <td className="p-2 font-bold text-slate-900 dark:text-zinc-100">Total Deductions</td>
-                        <td className="p-2 text-right font-black text-red-600 dark:text-red-400 text-xs">₹{totalDed.toLocaleString('en-IN')}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Net pay */}
-              <div className="bg-[#005EB8] text-white px-4 py-3 rounded-lg text-center shadow-inner mt-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                <span className="text-[9px] uppercase font-black tracking-widest opacity-85">Net Disbursed Take-home Salary</span>
-                <span className="text-xl sm:text-2xl font-black tracking-tight">{getVal('Net Pay')}</span>
-              </div>
-
-              <div className="text-center text-[9px] text-slate-400 leading-normal border-t border-slate-100 dark:border-zinc-800 pt-2 mt-3">
-                This slip is generated dynamically from official project payroll records. No physical signature is required.
-              </div>
-            </div>
-          </Card>
-
-          {/* Print button */}
-          <div className="flex gap-3 justify-center">
-            <Button
+          {/* Download & Print Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button 
               onClick={handlePrintSlip}
               icon={<PrinterOutlined />}
-              className="rounded-lg text-xs font-bold h-9 px-6"
+              className="rounded-lg text-xs font-bold h-10 px-6"
             >
               Print Payslip
             </Button>
@@ -488,11 +682,89 @@ interface AdminSalariesManagerProps {
   projectStaff: any[];
 }
 
-export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
+export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = ({ projectStaff }) => {
   const [salaries, setSalaries] = useState<SalarySlip[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
 
+  // Manual Create/Edit State
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [editingSlip, setEditingSlip] = useState<SalarySlip | null>(null);
+  const [manualForm] = Form.useForm();
+
+  const handleOpenCreateModal = () => {
+    setEditingSlip(null);
+    manualForm.resetFields();
+    manualForm.setFieldsValue({
+      month: 'July',
+      year: '2026',
+      basicPay: '78000',
+      hra: '15600',
+      grossRemuneration: '93600',
+      incomeTaxDeduction: '1000',
+      lwpDeduction: '0',
+      netPay: '92600'
+    });
+    setManualModalOpen(true);
+  };
+
+  const handleOpenEditModal = (slip: SalarySlip) => {
+    setEditingSlip(slip);
+    manualForm.resetFields();
+    manualForm.setFieldsValue({
+      name: slip.name,
+      employeeCode: slip.employeeCode,
+      mobile: slip.mobile,
+      aadhaarNumber: slip.aadhaarNumber,
+      month: slip.month,
+      year: slip.year,
+      basicPay: slip.details?.['Basic Pay'] || slip.details?.['Basic_Pay'] || '',
+      hra: slip.details?.['HRA'] || '',
+      grossRemuneration: slip.details?.['Gross Remuneration '] || slip.details?.['Gross_Remuneration '] || '',
+      incomeTaxDeduction: slip.details?.['InCome Tax Deduction'] || slip.details?.['InCome_Tax_Deduction'] || '',
+      lwpDeduction: slip.details?.['LWP Deduction'] || slip.details?.['LWP_Deduction'] || '',
+      netPay: slip.details?.['Net Pay'] || slip.details?.['Net_Pay'] || ''
+    });
+    setManualModalOpen(true);
+  };
+
+  const handleSaveManualSlip = async (values: any) => {
+    try {
+      const details: Record<string, string> = {
+        'Basic Pay': values.basicPay,
+        'HRA': values.hra,
+        'Gross Remuneration ': values.grossRemuneration,
+        'InCome Tax Deduction': values.incomeTaxDeduction,
+        'LWP Deduction': values.lwpDeduction,
+        'Net Pay': values.netPay
+      };
+
+      const payload = {
+        name: values.name,
+        employeeCode: values.employeeCode,
+        mobile: values.mobile,
+        aadhaarNumber: values.aadhaarNumber,
+        month: values.month,
+        year: values.year,
+        details
+      };
+
+      if (editingSlip) {
+        await apiService.updateSalarySlip(editingSlip.id, payload);
+        message.success('Salary statement updated successfully.');
+      } else {
+        await apiService.createSalarySlip(payload);
+        message.success('Manual salary statement created successfully.');
+      }
+
+      setManualModalOpen(false);
+      fetchSalaries();
+    } catch (e: any) {
+      message.error(e.response?.data?.error || 'Failed to save manual salary statement.');
+    }
+  };
+  
+  // Upload State
   const [csvText, setCsvText] = useState('');
   const [csvFileName, setCsvFileName] = useState('');
   const [uploadMonth, setUploadMonth] = useState('July');
@@ -531,11 +803,15 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       setCsvText(text);
-
+      
+      // Parse a quick preview
       const lines = text.split(/\r\n|\n/).filter(line => line.trim().length > 0);
       if (lines.length > 0) {
         const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-        setParsedPreview({ headers, rowsCount: lines.length - 1 });
+        setParsedPreview({
+          headers,
+          rowsCount: lines.length - 1
+        });
       }
     };
     reader.readAsText(file);
@@ -549,7 +825,11 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
 
     setSubmitting(true);
     try {
-      const res = await apiService.uploadSalaryCSV({ csvText, month: uploadMonth, year: uploadYear });
+      const res = await apiService.uploadSalaryCSV({
+        csvText,
+        month: uploadMonth,
+        year: uploadYear
+      });
       if (res.success) {
         message.success(res.message || 'Salaries uploaded successfully.');
         setCsvText('');
@@ -578,7 +858,8 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
     }
   };
 
-  const filteredSalaries = salaries.filter(s =>
+  // Filter salaries by search query
+  const filteredSalaries = salaries.filter(s => 
     s.name.toLowerCase().includes(searchText.toLowerCase()) ||
     s.employeeCode.toLowerCase().includes(searchText.toLowerCase()) ||
     s.month.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -586,32 +867,64 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
   );
 
   const columns = [
-    { title: 'Employee Name', dataIndex: 'name', key: 'name' },
+    { title: 'Employee Name', dataIndex: 'name', key: 'name', font: 'bold' },
     { title: 'Temp Code', dataIndex: 'employeeCode', key: 'employeeCode' },
-    { title: 'Mobile', dataIndex: 'mobile', key: 'mobile', render: (val: string) => val ? `XXXXXX${val.slice(-4)}` : '-' },
-    { title: 'Aadhaar', dataIndex: 'aadhaarNumber', key: 'aadhaarNumber', render: (val: string) => val ? `XXXX-XXXX-${val.slice(-4)}` : '-' },
-    { title: 'Month', dataIndex: 'month', key: 'month', render: (val: string) => <Tag color="blue" className="font-bold">{val}</Tag> },
+    { title: 'Registered Mobile', dataIndex: 'mobile', key: 'mobile', render: (val: string) => val ? `XXXXXX${val.slice(-4)}` : '-' },
+    { title: 'Aadhaar (Masked)', dataIndex: 'aadhaarNumber', key: 'aadhaarNumber', render: (val: string) => val ? `XXXX-XXXX-${val.slice(-4)}` : '-' },
+    { title: 'Payslip Month', dataIndex: 'month', key: 'month', render: (val: string) => <Tag color="blue" className="font-bold">{val}</Tag> },
     { title: 'Year', dataIndex: 'year', key: 'year' },
-    {
-      title: 'Action',
-      key: 'action',
+    { 
+      title: 'Action', 
+      key: 'action', 
       render: (_: any, rec: SalarySlip) => (
-        <Popconfirm title="Delete this payslip statement?" onConfirm={() => handleDeleteSlip(rec.id)}>
-          <Button type="text" danger size="small" icon={<DeleteOutlined />} title="Delete Slip" />
-        </Popconfirm>
-      )
+        <Space size="small">
+          <Button 
+            type="text" 
+            size="small" 
+            icon={<EditOutlined className="text-blue-500" />} 
+            onClick={() => handleOpenEditModal(rec)} 
+            title="Edit Slip" 
+          />
+          <Popconfirm title="Delete this payslip statement?" onConfirm={() => handleDeleteSlip(rec.id)}>
+            <Button type="text" danger size="small" icon={<DeleteOutlined />} title="Delete Slip" />
+          </Popconfirm>
+        </Space>
+      ) 
     }
   ];
 
   const downloadSampleCSV = () => {
     const headers = [
-      "Employee_Code", "Project_Name", "Scientist_Name", "Scientist_Designation", "Employee Name",
-      "DOJ ", "Tenure_up_to", "Designation", "Mobile_Number", "Address", "Aadhaar_Number",
-      "PAN_Number", "Bank_Name", "Account Number", "IFSC_Code", "Pay_Month", "Pay Year",
-      "Basic_Pay", "HRA", "Balance_Leave_Brought_from_Previous_Month",
-      "Leave_Credit_as_on_Last_pay_month_Last_Day", "Total_Leave", "Leave_Availed_During_the_Month",
-      "Leave_Balance_as_on_31.03.26", "Leave_Without_Pay", "Total_Present_Day ",
-      "Gross_Remuneration ", "InCome_Tax_Deduction", "LWP_Deduction", "Net_Pay"
+      "Employee_Code",
+      "Project_Name",
+      "Scientist_Name",
+      "Scientist_Designation",
+      "Employee Name",
+      "DOJ ",
+      "Tenure_up_to",
+      "Designation",
+      "Mobile_Number",
+      "Address",
+      "Aadhaar_Number",
+      "PAN_Number",
+      "Bank_Name",
+      "Account Number",
+      "IFSC_Code",
+      "Pay_Month",
+      "Pay Year",
+      "Basic_Pay",
+      "HRA",
+      "Balance_Leave_Brought_from_Previous_Month",
+      "Leave_Credit_as_on_Last_pay_month_Last_Day",
+      "Total_Leave",
+      "Leave_Availed_During_the_Month",
+      "Leave_Balance_as_on_31.03.26",
+      "Leave_Without_Pay",
+      "Total_Present_Day ",
+      "Gross_Remuneration ",
+      "InCome_Tax_Deduction",
+      "LWP_Deduction",
+      "Net_Pay"
     ].join(",");
 
     const rows = [
@@ -623,6 +936,7 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
     ];
 
     const csvContent = headers + "\n" + rows.join("\n");
+    
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -636,13 +950,14 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-6">
       <Row gutter={[16, 16]}>
+        {/* Left: Upload and Preview panel */}
         <Col xs={24} lg={10}>
-          <Card
+          <Card 
             title={
-              <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 w-full py-1">
-                <span className="font-extrabold text-xs sm:text-sm text-blue-700 dark:text-blue-400">📊 Upload Salary Payroll Sheet</span>
+              <div className="flex justify-between items-center w-full py-1">
+                <span className="font-extrabold text-xs sm:text-sm text-blue-700 dark:text-blue-400">📊 UPLOAD NEW SALARY PAYROLL SHEET</span>
                 <Button size="small" type="dashed" className="text-[10px] font-bold" onClick={downloadSampleCSV}>
                   Sample CSV
                 </Button>
@@ -653,28 +968,32 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
           >
             <div className="space-y-4">
               <Row gutter={12}>
-                <Col xs={12}>
+                <Col span={12}>
                   <label className="text-[11px] font-bold text-slate-500 block mb-1">Upload Period Month</label>
                   <Select value={uploadMonth} onChange={setUploadMonth} className="w-full">
-                    {MONTHS.map(m => <Option key={m} value={m}>{m}</Option>)}
+                    {MONTHS.map(m => (
+                      <Option key={m} value={m}>{m}</Option>
+                    ))}
                   </Select>
                 </Col>
-                <Col xs={12}>
+                <Col span={12}>
                   <label className="text-[11px] font-bold text-slate-500 block mb-1">Select Year</label>
                   <Select value={uploadYear} onChange={setUploadYear} className="w-full">
-                    {YEARS.map(y => <Option key={y} value={y}>{y}</Option>)}
+                    {YEARS.map(y => (
+                      <Option key={y} value={y}>{y}</Option>
+                    ))}
                   </Select>
                 </Col>
               </Row>
 
-              <div className="p-5 sm:p-6 border-2 border-dashed border-slate-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl transition-all cursor-pointer relative text-center">
-                <input
-                  type="file"
+              <div className="p-6 border-2 border-dashed border-slate-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl transition-all cursor-pointer relative text-center">
+                <input 
+                  type="file" 
                   accept=".csv"
-                  onChange={handleCSVFileChange}
+                  onChange={handleCSVFileChange} 
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
-                <UploadOutlined className="text-2xl sm:text-3xl text-slate-400 block mb-2" />
+                <UploadOutlined className="text-3xl text-slate-400 block mb-2" />
                 <span className="block text-xs font-bold text-slate-700 dark:text-zinc-200">
                   {csvFileName ? `✔️ Attached: ${csvFileName}` : 'Drag and drop or click to choose CSV payroll file'}
                 </span>
@@ -685,15 +1004,13 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
                 <div className="p-3 bg-slate-50 dark:bg-zinc-800/40 rounded-lg border border-slate-100 dark:border-zinc-800 text-[11px] space-y-2">
                   <div className="font-bold text-slate-700 dark:text-zinc-300">✔️ Parse Result Preview:</div>
                   <div>Rows Found: <strong className="text-emerald-600">{parsedPreview.rowsCount} rows</strong></div>
-                  <div className="flex flex-wrap gap-1">
-                    {parsedPreview.headers.map(h => <Tag key={h} className="text-[9px] m-0">{h}</Tag>)}
-                  </div>
+                  <div>Detected Headers: {parsedPreview.headers.map(h => <Tag key={h} className="text-[9px] m-0.5">{h}</Tag>)}</div>
                 </div>
               )}
 
-              <Button
-                type="primary"
-                block
+              <Button 
+                type="primary" 
+                block 
                 disabled={!csvText}
                 loading={submitting}
                 onClick={handleUploadCSV}
@@ -706,30 +1023,43 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
           </Card>
         </Col>
 
+        {/* Right: Uploaded logs overview list */}
         <Col xs={24} lg={14}>
-          <Card
+          <Card 
             title={
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-1">
                 <div>
                   <span className="text-xs text-slate-400 uppercase font-bold tracking-wider block">Central Registry Ledger</span>
-                  <span className="text-sm font-extrabold text-slate-800 dark:text-zinc-200">📂 Active Salary Payslip Statements</span>
+                  <span className="text-sm font-extrabold text-slate-800 dark:text-zinc-200">📂 Active Salary Payslips Statements</span>
                 </div>
-                <Input
-                  placeholder="Search statements..."
-                  prefix={<SearchOutlined className="text-slate-400" />}
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  allowClear
-                  className="rounded-lg text-xs w-full sm:w-[220px]"
-                />
+                <Space>
+                  <Button 
+                    type="primary" 
+                    size="small" 
+                    icon={<PlusOutlined />} 
+                    onClick={handleOpenCreateModal}
+                    className="rounded-lg text-xs font-bold bg-[#005EB8]"
+                  >
+                    Add Payslip
+                  </Button>
+                  <Input
+                    placeholder="Search statements..."
+                    prefix={<SearchOutlined className="text-slate-400" />}
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    allowClear
+                    style={{ width: '150px' }}
+                    className="rounded-lg text-xs"
+                  />
+                </Space>
               </div>
             }
             variant="borderless"
             className="shadow-sm rounded-xl overflow-hidden h-full"
           >
-            <Table
-              columns={columns}
-              dataSource={filteredSalaries}
+            <Table 
+              columns={columns} 
+              dataSource={filteredSalaries} 
               loading={loading}
               pagination={{ pageSize: 5 }}
               size="middle"
@@ -740,6 +1070,159 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = () => {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title={
+          <div className="border-b border-slate-100 pb-2">
+            <span className="font-extrabold text-sm text-blue-600 block uppercase">
+              {editingSlip ? '📝 EDIT MANUAL SALARY PAYSLIP' : '➕ GENERATE MANUAL SALARY PAYSLIP'}
+            </span>
+            <span className="text-xs text-slate-400 font-medium">
+              {editingSlip ? `ID: ${editingSlip.id}` : 'Create a single payslip entry directly'}
+            </span>
+          </div>
+        }
+        open={manualModalOpen}
+        onCancel={() => setManualModalOpen(false)}
+        footer={null}
+        width={680}
+        destroyOnClose
+      >
+        <Form
+          form={manualForm}
+          layout="vertical"
+          onFinish={handleSaveManualSlip}
+          className="mt-4"
+        >
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="text-xs font-semibold">Employee / Staff Name</span>}
+                name="name"
+                rules={[{ required: true, message: 'Please enter employee name' }]}
+              >
+                <Input placeholder="e.g. Rohit Deshmukh" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="text-xs font-semibold">Temporary Employee Code</span>}
+                name="employeeCode"
+                rules={[{ required: true, message: 'Please enter employee code' }]}
+              >
+                <Input placeholder="e.g. TEMP-10001" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="text-xs font-semibold">Registered Mobile Number</span>}
+                name="mobile"
+                rules={[{ required: true, message: 'Please enter mobile' }]}
+              >
+                <Input placeholder="e.g. 9988776655" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="text-xs font-semibold">Aadhaar Card Number</span>}
+                name="aadhaarNumber"
+                rules={[{ required: true, message: 'Please enter Aadhaar' }]}
+              >
+                <Input placeholder="e.g. 1234-5678-9012" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="text-xs font-semibold">Payslip Month</span>}
+                name="month"
+                rules={[{ required: true }]}
+              >
+                <Select>
+                  {MONTHS.map(m => <Option key={m} value={m}>{m}</Option>)}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                label={<span className="text-xs font-semibold">Payslip Year</span>}
+                name="year"
+                rules={[{ required: true }]}
+              >
+                <Select>
+                  {YEARS.map(y => <Option key={y} value={y}>{y}</Option>)}
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col xs={24}>
+              <Divider className="my-1" />
+              <span className="text-xs font-bold text-slate-700 block mb-3">💰 SALARY SLIP FINANCIAL BREAKDOWN</span>
+            </Col>
+
+            <Col xs={12} sm={8}>
+              <Form.Item
+                label={<span className="text-xs font-medium">Basic Pay (INR)</span>}
+                name="basicPay"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="e.g. 78000" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={8}>
+              <Form.Item
+                label={<span className="text-xs font-medium">HRA (INR)</span>}
+                name="hra"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="e.g. 15600" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={8}>
+              <Form.Item
+                label={<span className="text-xs font-medium">Gross Remuneration (INR)</span>}
+                name="grossRemuneration"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="e.g. 93600" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={8}>
+              <Form.Item
+                label={<span className="text-xs font-medium">Income Tax Deduction (INR)</span>}
+                name="incomeTaxDeduction"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="e.g. 1000" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={8}>
+              <Form.Item
+                label={<span className="text-xs font-medium">LWP Deduction (INR)</span>}
+                name="lwpDeduction"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="e.g. 0" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={8}>
+              <Form.Item
+                label={<span className="text-xs font-medium">Net Pay Remitted (INR)</span>}
+                name="netPay"
+                rules={[{ required: true }]}
+              >
+                <Input placeholder="e.g. 92600" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <div className="flex justify-end gap-2 mt-6">
+            <Button onClick={() => setManualModalOpen(false)}>Cancel</Button>
+            <Button type="primary" htmlType="submit" className="bg-[#005EB8]" icon={<CheckCircleOutlined />}>
+              Save Payslip Details
+            </Button>
+          </div>
+        </Form>
+      </Modal>
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Card, Form, Input, Button, Select, Table, Tag, Modal, 
   Row, Col, Space, Badge, Divider, Upload, message, Empty, Tabs, 
-  Statistic, Tooltip, Typography, List, Descriptions, Steps, Alert
+  Statistic, Tooltip, Typography, List, Descriptions, Steps, Alert, Popconfirm
 } from 'antd';
 import { 
   PlusOutlined, SearchOutlined, LoginOutlined, LogoutOutlined, 
@@ -12,7 +12,7 @@ import {
   EnvironmentOutlined, ApartmentOutlined, FileTextOutlined,
   EditOutlined, SyncOutlined, PrinterOutlined, AlertOutlined,
   FilterOutlined, ClockCircleOutlined, InfoCircleOutlined,
-  CheckOutlined
+  CheckOutlined, DeleteOutlined
 } from '@ant-design/icons';
 import { apiService } from '../services/api';
 import { Complaint } from '../types';
@@ -169,6 +169,16 @@ export const ComplaintPortal: React.FC = () => {
       message.error(e.response?.data?.error || 'Failed to fetch department complaints.');
     } finally {
       setLoadingComplaints(false);
+    }
+  };
+
+  const handleDeleteComplaint = async (id: string) => {
+    try {
+      await apiService.deleteComplaint(id);
+      message.success('Complaint deleted successfully.');
+      loadSuComplaints();
+    } catch (e: any) {
+      message.error(e.response?.data?.error || 'Failed to delete complaint.');
     }
   };
 
@@ -459,7 +469,6 @@ export const ComplaintPortal: React.FC = () => {
                               <Select size="middle">
                                 <Option value="IT">💻 IT (Network, Hardware, Software)</Option>
                                 <Option value="Maintenance">🔧 Maintenance (Electricity, Plumbing, HVAC)</Option>
-                                <Option value="Admin">📂 Administration (Approvals, General)</Option>
                               </Select>
                             </Form.Item>
                           </Col>
@@ -519,17 +528,17 @@ export const ComplaintPortal: React.FC = () => {
 
                   {/* Right Column: Self-Help Sidebar */}
                   <Col xs={24} lg={8}>
-                    <Space direction="vertical" className="w-full" size="middle">
+                    <Space orientation="vertical" className="w-full" size="middle">
                       <Card size="small" title={<span className="font-bold text-xs text-slate-700 dark:text-zinc-200">Grievance Flowchart</span>} className="rounded-xl border-slate-200 bg-white dark:bg-zinc-900">
                         <Steps
-                          direction="vertical"
+                          orientation="vertical"
                           size="small"
                           current={0}
                           items={[
-                            { title: 'Raise Grievance', description: 'Submit details and attach optional supporting document.' },
-                            { title: 'Desk Triage', description: 'Super User reviews severity and designates specific technician.' },
-                            { title: 'In-Progress Resolution', description: 'Official remark/custom status and progress notes are logged.' },
-                            { title: 'Completion & Receipt', description: 'Ticket is marked resolved and permanent PDF receipt is available.' }
+                            { title: 'Raise Grievance', content: 'Submit details and attach optional supporting document.' },
+                            { title: 'Desk Triage', content: 'Super User reviews severity and designates specific technician.' },
+                            { title: 'In-Progress Resolution', content: 'Official remark/custom status and progress notes are logged.' },
+                            { title: 'Completion & Receipt', content: 'Ticket is marked resolved and permanent PDF receipt is available.' }
                           ]}
                         />
                       </Card>
@@ -537,19 +546,19 @@ export const ComplaintPortal: React.FC = () => {
                       <Card size="small" title={<span className="font-bold text-xs text-slate-700 dark:text-zinc-200">🛠️ Departmental Self-Help Tips</span>} className="rounded-xl border-slate-200 bg-white dark:bg-zinc-900">
                         <div className="space-y-3 text-xs">
                           <Alert 
-                            message="💻 IT support" 
+                            title="💻 IT support" 
                             description="For network interruptions, try unplugging and re-inserting your LAN ethernet patch cable before raising tickets." 
                             type="info" 
                             showIcon 
                           />
                           <Alert 
-                            message="🔧 HVAC & Power" 
+                            title="🔧 HVAC & Power" 
                             description="Check if the mains switch is set on. If an AC remote has no display, try replacing the AAA dry cells." 
                             type="info" 
                             showIcon 
                           />
                           <Alert 
-                            message="📂 File Tracking" 
+                            title="📂 File Tracking" 
                             description="Kindly mention the official File diary number in the description for fast-track retrieval and approval." 
                             type="info" 
                             showIcon 
@@ -661,10 +670,10 @@ export const ComplaintPortal: React.FC = () => {
                                     size="small" 
                                     current={getStatusStepIndex(c.status)}
                                     items={[
-                                      { title: 'Registered', description: 'Pending Desk review' },
-                                      { title: 'Staff Designated', description: c.assignedStaff || 'Assigning specialist' },
-                                      { title: 'Action Taken', description: (c.status === 'Resolved' || c.status === 'Closed') ? 'Done' : 'Update pending' },
-                                      { title: 'Resolved / Closed', description: (c.status === 'Resolved' || c.status === 'Closed') ? 'Completed' : 'Awaiting fix' }
+                                      { title: 'Registered', content: 'Pending Desk review' },
+                                      { title: 'Staff Designated', content: c.assignedStaff || 'Assigning specialist' },
+                                      { title: 'Action Taken', content: (c.status === 'Resolved' || c.status === 'Closed') ? 'Done' : 'Update pending' },
+                                      { title: 'Resolved / Closed', content: (c.status === 'Resolved' || c.status === 'Closed') ? 'Completed' : 'Awaiting fix' }
                                     ]}
                                   />
                                 </div>
@@ -754,7 +763,6 @@ export const ComplaintPortal: React.FC = () => {
                         <ul className="list-disc list-inside mt-1.5 space-y-1">
                           <li>IT Department: <code>it_super1@nihr.res.in</code> (pass: <code>admin</code>)</li>
                           <li>Maintenance Dept: <code>maint_super1@nihr.res.in</code> (pass: <code>admin</code>)</li>
-                          <li>Admin Department: <code>admin_super1@nihr.res.in</code> (pass: <code>admin</code>)</li>
                         </ul>
                       </div>
                     </Card>
@@ -942,27 +950,45 @@ export const ComplaintPortal: React.FC = () => {
                           {
                             title: 'Actions',
                             key: 'actions',
-                            width: 80,
+                            width: 140,
                             render: (_: any, c: Complaint) => (
-                              <Button 
-                                type="primary" 
-                                size="small" 
-                                className="rounded-lg text-xs"
-                                icon={<EditOutlined />}
-                                onClick={() => {
-                                  setSelectedComplaint(c);
-                                  assignForm.setFieldsValue({
-                                    assignedStaff: c.assignedStaff,
-                                    status: c.status,
-                                    customStatusText: c.customStatusText,
-                                    priority: c.priority || 'Medium',
-                                    superUserRemark: c.superUserRemark || ''
-                                  });
-                                  setDetailModalOpen(true);
-                                }}
-                              >
-                                Manage
-                              </Button>
+                              <Space size="small">
+                                <Button 
+                                  type="primary" 
+                                  size="small" 
+                                  className="rounded-lg text-xs"
+                                  icon={<EditOutlined />}
+                                  onClick={() => {
+                                    setSelectedComplaint(c);
+                                    assignForm.setFieldsValue({
+                                      assignedStaff: c.assignedStaff,
+                                      status: c.status,
+                                      customStatusText: c.customStatusText,
+                                      priority: c.priority || 'Medium',
+                                      superUserRemark: c.superUserRemark || ''
+                                    });
+                                    setDetailModalOpen(true);
+                                  }}
+                                >
+                                  Manage
+                                </Button>
+                                <Popconfirm
+                                  title="Delete this ticket?"
+                                  onConfirm={() => handleDeleteComplaint(c.id)}
+                                  okText="Yes"
+                                  cancelText="No"
+                                  okButtonProps={{ danger: true, size: 'small' }}
+                                  cancelButtonProps={{ size: 'small' }}
+                                >
+                                  <Button 
+                                    type="text" 
+                                    danger 
+                                    size="small" 
+                                    className="rounded-lg text-xs hover:bg-red-50"
+                                    icon={<DeleteOutlined />}
+                                  />
+                                </Popconfirm>
+                              </Space>
                             )
                           }
                         ]}

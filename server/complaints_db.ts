@@ -12,7 +12,7 @@ export interface Complaint {
   locationRoom: string;
   department: string;
   complaintDescriptionFull: string;
-  typeOfComplaint: 'IT' | 'Maintenance' | 'Admin';
+  typeOfComplaint: 'IT' | 'Maintenance';
   photoDocument?: string; // Saved path or Base64
   photoName?: string;
   assignedStaff?: string;
@@ -29,7 +29,7 @@ export interface ComplaintSuperUser {
   name: string;
   email: string;
   passwordHash: string; // SHA256 of password
-  department: 'IT' | 'Maintenance' | 'Admin';
+  department: 'IT' | 'Maintenance';
 }
 
 export interface ComplaintsDatabaseSchema {
@@ -88,28 +88,6 @@ const INITIAL_COMPLAINTS_DATA: ComplaintsDatabaseSchema = {
       email: 'maint_super3@nihr.res.in',
       passwordHash: hashPassword('admin'),
       department: 'Maintenance',
-    },
-    // Administration Department Super Users (3)
-    {
-      id: 'admin-su-1',
-      name: 'Sanjay Saxena (Admin Officer)',
-      email: 'admin_super1@nihr.res.in',
-      passwordHash: hashPassword('admin'),
-      department: 'Admin',
-    },
-    {
-      id: 'admin-su-2',
-      name: 'Meena Kumari (Assistant Admin Registrar)',
-      email: 'admin_super2@nihr.res.in',
-      passwordHash: hashPassword('admin'),
-      department: 'Admin',
-    },
-    {
-      id: 'admin-su-3',
-      name: 'Gopal Subramanian (Administration Coordinator)',
-      email: 'admin_super3@nihr.res.in',
-      passwordHash: hashPassword('admin'),
-      department: 'Admin',
     },
   ],
   complaints: [

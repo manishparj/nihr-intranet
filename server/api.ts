@@ -1095,6 +1095,35 @@ router.put('/complaints/:id', (req: Request, res: Response) => {
   res.json(complaint);
 });
 
+// Delete a Complaint (Super User)
+router.delete('/complaints/:id', (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+  const token = authHeader.split(' ')[1];
+  const payload = verifyToken(token);
+  if (!payload || payload.role !== 'complaint_super_user') {
+    return res.status(401).json({ error: 'Invalid or expired super user token.' });
+  }
+
+  const { id } = req.params;
+  const complaints = ComplaintsDatabase.get('complaints');
+  const index = complaints.findIndex(c => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Complaint not found.' });
+  }
+
+  const complaint = complaints[index];
+  if (complaint.typeOfComplaint !== payload.department) {
+    return res.status(403).json({ error: 'You are not authorized to delete complaints for other departments.' });
+  }
+
+  complaints.splice(index, 1);
+  ComplaintsDatabase.set('complaints', complaints);
+  res.json({ success: true, message: 'Complaint deleted successfully.' });
+});
+
 // ==========================================
 // PROJECT STAFF SALARY SLIPS SYSTEM
 // ==========================================
@@ -1471,6 +1500,60 @@ router.delete('/salaries/:id', authenticateAdmin, (req: Request, res: Response) 
   const filtered = salaries.filter(s => s.id !== id);
   Database.set('salaries', filtered);
   res.json({ success: true, message: 'Salary slip deleted successfully.' });
+});
+
+// Create a specific salary slip manually (admin only)
+router.post('/salaries', authenticateAdmin, (req: Request, res: Response) => {
+  const { name, employeeCode, mobile, aadhaarNumber, month, year, details } = req.body;
+  if (!name || !employeeCode || !mobile || !aadhaarNumber || !month || !year) {
+    return res.status(400).json({ error: 'Name, Code, Mobile, Aadhaar, Month, and Year are required.' });
+  }
+
+  const salaries = Database.get('salaries') || [];
+  const newSlip = {
+    id: 'sal-' + Math.random().toString(36).substr(2, 9),
+    name,
+    employeeCode,
+    mobile,
+    aadhaarNumber,
+    month,
+    year,
+    uploadedAt: new Date().toISOString(),
+    details: details || {}
+  };
+
+  salaries.push(newSlip);
+  Database.set('salaries', salaries);
+  res.json({ success: true, salarySlip: newSlip });
+});
+
+// Update a specific salary slip manually (admin only)
+router.put('/salaries/:id', authenticateAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, employeeCode, mobile, aadhaarNumber, month, year, details } = req.body;
+
+  const salaries = Database.get('salaries') || [];
+  const index = salaries.findIndex(s => s.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Salary slip not found.' });
+  }
+
+  const existing = salaries[index];
+  const updatedSlip = {
+    ...existing,
+    name: name !== undefined ? name : existing.name,
+    employeeCode: employeeCode !== undefined ? employeeCode : existing.employeeCode,
+    mobile: mobile !== undefined ? mobile : existing.mobile,
+    aadhaarNumber: aadhaarNumber !== undefined ? aadhaarNumber : existing.aadhaarNumber,
+    month: month !== undefined ? month : existing.month,
+    year: year !== undefined ? year : existing.year,
+    details: details !== undefined ? { ...existing.details, ...details } : existing.details,
+    updatedAt: new Date().toISOString()
+  };
+
+  salaries[index] = updatedSlip;
+  Database.set('salaries', salaries);
+  res.json({ success: true, salarySlip: updatedSlip });
 });
 
 export default router;

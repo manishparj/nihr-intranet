@@ -1813,7 +1813,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
               />
             </Col>
             <Col xs={24} lg={8}>
-              <Space direction="vertical" className="w-full animate-fadeIn" size="middle">
+              <Space orientation="vertical" className="w-full animate-fadeIn" size="middle">
                 <Card 
                   title={<span className="font-extrabold text-xs sm:text-sm text-[#005EB8] dark:text-blue-400">⚙️ QUICK ADMIN PANEL</span>} 
                   variant="borderless" 
