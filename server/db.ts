@@ -246,6 +246,7 @@ export interface DatabaseSchema {
   broadcasts: BroadcastMessage[];
   visibility: VisibilityConfig;
   salaries: SalarySlip[];
+  pendingProjectStaff: ProjectStaff[];
 }
 
 const DEFAULT_VISIBILITY: VisibilityConfig = {
@@ -564,6 +565,7 @@ const INITIAL_DATA: DatabaseSchema = {
   ],
   visibility: DEFAULT_VISIBILITY,
   salaries: [],
+  pendingProjectStaff: [],
 };
 
 export class Database {
@@ -616,6 +618,7 @@ export class Database {
         if (!this.data.broadcasts) this.data.broadcasts = INITIAL_DATA.broadcasts;
         if (!this.data.visibility) this.data.visibility = INITIAL_DATA.visibility;
         if (!this.data.salaries) this.data.salaries = [];
+        if (!this.data.pendingProjectStaff) this.data.pendingProjectStaff = [];
       }
       return this.data!;
     } catch (e) {

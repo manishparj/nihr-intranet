@@ -840,12 +840,10 @@ export const ComplaintPortal: React.FC = () => {
                         >
                           <Option value="all">All Statuses</Option>
                           <Option value="Draft">Draft</Option>
-                          <Option value="Pending">Pending</Option>
                           <Option value="Staff Assigned">Staff Assigned</Option>
-                          <Option value="Staff Action Needed">Staff Action Needed</Option>
-                          <Option value="Dependency">Dependency</Option>
                           <Option value="Resolved">Resolved</Option>
-                          <Option value="Closed">Closed</Option>
+                          <Option value="Custom Status">Custom Status</Option>
+                          <Option value="Dependency">Dependency</Option>
                         </Select>
                         <Select 
                           value={filterPriority} 
@@ -1086,13 +1084,10 @@ export const ComplaintPortal: React.FC = () => {
                     >
                       <Select>
                         <Option value="Draft">Draft</Option>
-                        <Option value="Pending">Pending</Option>
                         <Option value="Staff Assigned">Staff Assigned</Option>
                         <Option value="Resolved">Resolved</Option>
-                        <Option value="Closed">Closed</Option>
-                        <Option value="Staff Action Needed">Staff Action Needed</Option>
-                        <Option value="Dependency">Dependency</Option>
                         <Option value="Custom Status">Custom Status</Option>
+                        <Option value="Dependency">Dependency</Option>
                       </Select>
                     </Form.Item>
                   </Col>

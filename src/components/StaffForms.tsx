@@ -38,6 +38,13 @@ const projectStaffSchema = Yup.object().shape({
   ifscCode: Yup.string().optional(),
   bankName: Yup.string().optional(),
   contractPeriod: Yup.number().positive('Must be positive').optional(),
+  motherName: Yup.string().optional(),
+  motherPhone: Yup.string().optional(),
+  fatherName: Yup.string().optional(),
+  fatherPhone: Yup.string().optional(),
+  maritalStatus: Yup.string().oneOf(['Single', 'Married', 'Divorced', 'Widowed']).optional(),
+  spouseName: Yup.string().optional(),
+  spousePhone: Yup.string().optional(),
 });
 
 const permanentStaffSchema = Yup.object().shape({
@@ -87,6 +94,8 @@ export const ProjectStaffForm: React.FC<ProjectStaffFormProps> = ({
     departmentLocation: '', roomNumber: '', educationalQualification: '', contractPeriod: 12,
     category: 'UR', status: 'Active', lastWorkingDate: '', leavingReason: '', noDuesCleared: false,
     employeeCode: '', previousIcmrExperience: [], previousNonIcmrExperience: [],
+    motherName: '', motherPhone: '', fatherName: '', fatherPhone: '',
+    maritalStatus: 'Single', spouseName: '', spousePhone: '',
     ...initialValues,
   };
 
@@ -227,6 +236,48 @@ export const ProjectStaffForm: React.FC<ProjectStaffFormProps> = ({
                 <label className="text-xs font-semibold text-slate-600 block mb-1">Permanent Residential Address</label>
                 <Field as={Input} name="address" placeholder="Residential Town, Sector, State" className="rounded-md" />
               </Col>
+              
+              <Col xs={24}>
+                <Divider orientation={"left" as any} className="m-0 text-xs font-bold text-slate-500 uppercase tracking-wider">👨‍👩‍👦 Family & Marital Status Details</Divider>
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Father's Name</label>
+                <Field as={Input} name="fatherName" placeholder="Father's Full Name" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Father's Mobile Number</label>
+                <Field as={Input} name="fatherPhone" placeholder="Father's Mobile" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Mother's Name</label>
+                <Field as={Input} name="motherName" placeholder="Mother's Full Name" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Mother's Mobile Number</label>
+                <Field as={Input} name="motherPhone" placeholder="Mother's Mobile" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Marital Status</label>
+                <Select value={values.maritalStatus || 'Single'} onChange={(v) => setFieldValue('maritalStatus', v)} className="w-full">
+                  <Option value="Single">Single</Option>
+                  <Option value="Married">Married</Option>
+                  <Option value="Divorced">Divorced</Option>
+                  <Option value="Widowed">Widowed</Option>
+                </Select>
+              </Col>
+              {values.maritalStatus === 'Married' && (
+                <>
+                  <Col xs={12} md={9}>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Spouse Name</label>
+                    <Field as={Input} name="spouseName" placeholder="Spouse's Full Name" className="rounded-md" />
+                  </Col>
+                  <Col xs={12} md={9}>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Spouse Phone Number</label>
+                    <Field as={Input} name="spousePhone" placeholder="Spouse's Mobile" className="rounded-md" />
+                  </Col>
+                </>
+              )}
+
               <Col xs={12} md={8}>
                 <label className="text-xs font-semibold text-slate-600 block mb-1">Status</label>
                 <Select value={values.status} onChange={(v) => setFieldValue('status', v)} className="w-full">

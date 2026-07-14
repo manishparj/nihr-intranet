@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Layout, Menu, Button, Card, Table, Modal, Input, Row, Col, Space, Badge, 
+  Layout, Menu, Button, Card, Table, Modal, Input, Row, Col, Space, Badge, Radio, 
   Switch, Tag, Spin, Popconfirm, Avatar, Divider, message, ConfigProvider, theme, Empty,
   App as AntdApp, Tabs, Breadcrumb, Pagination
 } from 'antd';
@@ -10,7 +10,7 @@ import {
   LogoutOutlined, LoginOutlined, SearchOutlined, PlusOutlined, EditOutlined, 
   DeleteOutlined, BulbOutlined, BulbFilled, TeamOutlined, KeyOutlined, 
   UnlockOutlined, InfoCircleOutlined, DownloadOutlined, StarOutlined, LockOutlined,
-  AppstoreOutlined, CustomerServiceOutlined, PrinterOutlined
+  AppstoreOutlined, CustomerServiceOutlined, PrinterOutlined, DatabaseOutlined
 } from '@ant-design/icons';
 import { Formik, Form, Field } from 'formik';
 import { apiService } from './services/api';
@@ -26,6 +26,12 @@ import { ScientistForm, ProjectForm } from './components/AdminForms';
 import { ProjectStaffForm, PermanentStaffForm, YPConsultantForm } from './components/StaffForms';
 import { ComplaintPortal } from './components/ComplaintPortal';
 import { SalaryPortalView, AdminSalariesManager } from './components/SalaryPortal';
+import { AppHeader } from './components/layout/AppHeader';
+import { HomeDashboard } from './components/HomeDashboard';
+import { PublicScientistsView } from './components/PublicScientistsView';
+import { PublicProjectStaffView } from './components/PublicProjectStaffView';
+import { PublicPermanentStaffView } from './components/PublicPermanentStaffView';
+import { PublicYPConsultantsView } from './components/PublicYPConsultantsView';
 
 const { Header, Content, Footer, Sider } = Layout;
 
@@ -130,6 +136,8 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const [events, setEvents] = useState<Event[]>([]);
   const [broadcasts, setBroadcasts] = useState<BroadcastMessage[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
+  const [pendingProjectStaff, setPendingProjectStaff] = useState<any[]>([]);
+  const [activeProjectStaffTab, setActiveProjectStaffTab] = useState<string>('ledger');
   const [visibility, setVisibility] = useState<VisibilityConfig | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
@@ -344,7 +352,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       "Bank Name", "Account Number", "IFSC Code", "Department Location", "Room Number",
       "Educational Qualification", "Contract Period (Months)", "Category", "Status",
       "Last Working Date", "Leaving Reason", "No Dues Cleared", "Employee Code",
-      "Previous ICMR Experience", "Previous Non-ICMR Experience", "ICMR Exp Months", "Non-ICMR Exp Months", "Total Exp Months"
+      "Previous ICMR Experience", "Previous Non-ICMR Experience", "ICMR Exp Months", "Non-ICMR Exp Months", "Total Exp Months",
+      "Father's Name", "Father's Mobile Number", "Mother's Name", "Mother's Mobile Number",
+      "Marital Status", "Spouse Name", "Spouse Mobile Number"
     ];
     const rows = projectStaff.map(p => [
       p.id, p.projectId, p.scientistId, p.name, p.dob,
@@ -354,9 +364,25 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       p.educationalQualification, p.contractPeriod, p.category, p.status,
       p.lastWorkingDate || '', p.leavingReason || '', p.noDuesCleared ? 'Yes' : 'No', p.employeeCode,
       formatExperience(p.previousIcmrExperience), formatExperience(p.previousNonIcmrExperience),
-      p.icmrExpMonths ?? 0, p.nonIcmrExpMonths ?? 0, p.totalExpMonths ?? 0
+      p.icmrExpMonths ?? 0, p.nonIcmrExpMonths ?? 0, p.totalExpMonths ?? 0,
+      p.fatherName || '', p.fatherPhone || '', p.motherName || '', p.motherPhone || '',
+      p.maritalStatus || '', p.spouseName || '', p.spousePhone || ''
     ]);
     downloadCSV(headers, rows, "All_Project_Staff_Details.csv");
+  };
+
+  const exportProjectsCSV = () => {
+    const headers = [
+      "ID", "Project Title/Name", "Short Name", "Funding Type", "Status",
+      "Start Date", "End Date", "Total Budget Allocated", "Principal Investigator (Scientist ID)",
+      "Provisional UCs count"
+    ];
+    const rows = projects.map(p => [
+      p.id, p.name, p.shortName, p.type, p.status,
+      p.startDate, p.endDate, p.budget, p.piId,
+      (p.provisionalUCs || []).length
+    ]);
+    downloadCSV(headers, rows, "All_Project_Details.csv");
   };
 
   const exportYPConsultantCSV = () => {
@@ -528,10 +554,14 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       }
       setVisibility(vis);
 
-      // If authenticated, also fetch admins list
+      // If authenticated, also fetch admins list and pending project staff registrations
       if (localStorage.getItem('nihr_token')) {
-        const adminProfiles = await apiService.getAdmins();
+        const [adminProfiles, pendingRegistrations] = await Promise.all([
+          apiService.getAdmins(),
+          apiService.getPendingProjectStaff()
+        ]);
         setAdmins(adminProfiles);
+        setPendingProjectStaff(pendingRegistrations);
       }
     } catch (e) {
       console.error('Error loading data', e);
@@ -1059,731 +1089,78 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       return <ComplaintPortal />;
     }
 
-    // A. Public Dashboard View
+    // A. Public Dashboard Views
     if (currentKey === 'public-dashboard') {
-      const isDateInCurrentWeekLocal = (dateStr?: string): boolean => {
-        if (!dateStr) return false;
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return false;
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        endOfWeek.setHours(23, 59, 59, 999);
-        const eventThisYear = new Date(now.getFullYear(), d.getMonth(), d.getDate());
-        return eventThisYear >= startOfWeek && eventThisYear <= endOfWeek;
-      };
-
-      const getWeeklyBirthdaysLocal = () => {
-        const list: { name: string; designation: string; category: string; date: string }[] = [];
-        scientists.filter(s => s.status === 'Active' && isDateInCurrentWeekLocal(s.dob)).forEach(s => {
-          list.push({ name: s.name, designation: s.designation, category: 'Scientist', date: s.dob });
-        });
-        projectStaff.filter(s => s.status === 'Active' && isDateInCurrentWeekLocal(s.dob)).forEach(s => {
-          list.push({ name: s.name, designation: s.designation, category: 'Project Research Staff', date: s.dob });
-        });
-        permanentStaff.filter(s => s.status === 'Active' && isDateInCurrentWeekLocal(s.dob)).forEach(s => {
-          list.push({ name: s.name, designation: s.designation, category: 'Permanent Staff', date: s.dob });
-        });
-        ypConsultants.filter(s => s.status === 'Active' && isDateInCurrentWeekLocal(s.dob)).forEach(s => {
-          list.push({ name: s.name, designation: s.fullDesignation, category: s.designationType, date: s.dob });
-        });
-        return list;
-      };
-
-      const getWeeklyAnniversariesLocal = () => {
-        const list: { name: string; designation: string; category: string; date: string; years: number }[] = [];
-        const currentYear = new Date().getFullYear();
-        const addAnniversary = (emp: { name: string; doj: string; designation: string; category: string }) => {
-          if (isDateInCurrentWeekLocal(emp.doj)) {
-            const joinYear = new Date(emp.doj).getFullYear();
-            const years = currentYear - joinYear;
-            if (years > 0) {
-              list.push({ name: emp.name, designation: emp.designation, category: emp.category, date: emp.doj, years });
-            }
-          }
-        };
-        scientists.filter(s => s.status === 'Active').forEach(s => addAnniversary({ name: s.name, doj: s.doj, designation: s.designation, category: 'Scientist' }));
-        projectStaff.filter(s => s.status === 'Active').forEach(s => addAnniversary({ name: s.name, doj: s.doj, designation: s.designation, category: 'Project Research Staff' }));
-        permanentStaff.filter(s => s.status === 'Active').forEach(s => addAnniversary({ name: s.name, doj: s.doj, designation: s.designation, category: 'Permanent Staff' }));
-        ypConsultants.filter(s => s.status === 'Active').forEach(s => addAnniversary({ name: s.name, doj: s.doj, designation: s.fullDesignation, category: s.designationType }));
-        return list;
-      };
-
-      const localBirthdays = getWeeklyBirthdaysLocal();
-      const localAnniversaries = getWeeklyAnniversariesLocal();
-
-      const tabItems = [
-        ...(visibility?.modules.scientists ? [{
-          key: 'scientists',
-          label: (
-            <span>
-              <UserOutlined />
-              Scientists
-            </span>
-          ),
-          children: (
-            <div className="space-y-6">
-              <Card 
-                title={
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 py-1">
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase font-bold tracking-wider block">SCIENTISTS DIRECTORY & DEPARTMENTS</span>
-                      <span className="text-sm font-extrabold text-slate-800 dark:text-zinc-200">🎓 Scientists Registry (Click row to view led projects)</span>
-                    </div>
-                  </div>
-                } 
-                variant="borderless" 
-                className="shadow-sm rounded-xl overflow-hidden"
-              >
-                <Table 
-                  columns={getScientistColumns()} 
-                  dataSource={scientists} 
-                  pagination={{ pageSize: 8 }} 
-                  size="middle" 
-                  rowKey="id" 
-                  scroll={{ x: 'max-content' }}
-                  onRow={(record) => ({
-                    onClick: (e: any) => {
-                      if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-                      setSelectedScientist(selectedScientist?.id === record.id ? null : record);
-                      setSelectedProject(null);
-                    },
-                    className: `cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200 ${selectedScientist?.id === record.id ? 'bg-blue-50/50 dark:bg-blue-950/20 border-l-4 border-blue-500 font-semibold' : ''}`
-                  })}
-                />
-              </Card>
-
-              {/* Drill Down Level 1: Projects led by selected scientist */}
-              {selectedScientist && (
-                <div className="p-5 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
-                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-zinc-800 pb-2">
-                    <div>
-                      <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest block">Drill-Down Level 1: Scientific Leadership</span>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200 flex items-center gap-2">
-                        🔬 Projects led by Dr. {selectedScientist.name} 
-                        <Tag color="blue" className="ml-1 text-[10px] uppercase font-bold">{selectedScientist.employeeCode}</Tag>
-                      </h4>
-                    </div>
-                    <Button size="small" danger onClick={() => { setSelectedScientist(null); setSelectedProject(null); }}>Clear Selection</Button>
-                  </div>
-
-                  {(() => {
-                    const scientistProjects = projects.filter(p => p.piId === selectedScientist.id);
-                    if (scientistProjects.length === 0) {
-                      return (
-                        <Empty 
-                          description="This scientist is not leading any extramural research projects currently." 
-                          image={Empty.PRESENTED_IMAGE_SIMPLE} 
-                        />
-                      );
-                    }
-
-                    return (
-                      <Table
-                        columns={getProjectColumns().filter(col => col.key !== 'piId')}
-                        dataSource={scientistProjects}
-                        pagination={{ pageSize: 5 }}
-                        size="small"
-                        rowKey="id"
-                        scroll={{ x: 'max-content' }}
-                        onRow={(projectRecord) => ({
-                          onClick: (e: any) => {
-                            if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-                            setSelectedProject(selectedProject?.id === projectRecord.id ? null : projectRecord);
-                          },
-                          className: `cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200 ${selectedProject?.id === projectRecord.id ? 'bg-orange-50/50 dark:bg-orange-950/20 border-l-4 border-orange-500 font-semibold' : ''}`
-                        })}
-                      />
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Drill Down Level 2: Project details & staff list */}
-              {selectedScientist && selectedProject && (
-                <div className="p-5 bg-slate-50 dark:bg-zinc-900/50 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
-                  <div className="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-zinc-800 pb-2">
-                    <div>
-                      <span className="text-[10px] text-orange-500 font-bold uppercase tracking-widest block">Drill-Down Level 2: Administrative Details & Team Appointed</span>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
-                        📂 Scheme Ledger: {selectedProject.name} ({selectedProject.shortName})
-                      </h4>
-                    </div>
-                    <Button size="small" onClick={() => setSelectedProject(null)}>Close Project View</Button>
-                  </div>
-
-                  <Row gutter={[16, 16]}>
-                    <Col xs={24} md={8}>
-                      <Card size="small" title="Project Specifications" variant="borderless" className="shadow-none bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800">
-                        <div className="space-y-2 text-xs">
-                          <div><strong className="text-slate-400">Type:</strong> <Tag color="orange" className="ml-1">{selectedProject.type}</Tag></div>
-                          <div><strong className="text-slate-400">Status:</strong> <Tag color={selectedProject.status === 'Completed' ? 'green' : 'blue'} className="ml-1">{selectedProject.status}</Tag></div>
-                          <div><strong className="text-slate-400">Budget Limit:</strong> <span className="font-semibold text-green-600">₹{selectedProject.budget.toLocaleString()}</span></div>
-                          <div><strong className="text-slate-400">Duration Scheduled:</strong> {selectedProject.durationDays} days</div>
-                          <div><strong className="text-slate-400">Pending Days Left:</strong> {selectedProject.pendingDays} days</div>
-                        </div>
-                      </Card>
-                    </Col>
-                    <Col xs={24} md={16}>
-                      <Card size="small" title="👥 Appointed Research Project Staff (Click row for full profile)" variant="borderless" className="shadow-none bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800">
-                        {(() => {
-                          const associatedStaff = projectStaff.filter(s => s.projectId === selectedProject.id);
-                          if (associatedStaff.length === 0) {
-                            return <Empty description="No research staff registered or appointed to this project." image={Empty.PRESENTED_IMAGE_SIMPLE} />;
-                          }
-
-                          return (
-                            <Table
-                              columns={getProjectStaffColumns().filter(col => col.key !== 'projectId')}
-                              dataSource={associatedStaff}
-                              pagination={{ pageSize: 5 }}
-                              size="small"
-                              rowKey="id"
-                              scroll={{ x: 'max-content' }}
-                              onRow={(staffRecord) => ({
-                                onClick: (e: any) => {
-                                  if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-                                  openStaffDetailsModal(staffRecord, 'pstaff');
-                                },
-                                className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
-                              })}
-                            />
-                          );
-                        })()}
-                      </Card>
-                    </Col>
-                  </Row>
-                </div>
-              )}
-            </div>
-          )
-        }] : []),
-        ...(visibility?.modules.projects ? [{
-          key: 'projects',
-          label: (
-            <span>
-              <ProjectOutlined />
-              Projects Ledger
-            </span>
-          ),
-          children: (
-            <div className="space-y-6">
-              <Card 
-                title={
-                  <div>
-                    <span className="text-xs text-slate-400 uppercase font-bold tracking-wider block">EXTRAMURAL RESEARCH SCHEMES</span>
-                    <span className="text-sm font-extrabold text-slate-800 dark:text-zinc-200">🔬 Research Projects Ledger (Click row to drill-down)</span>
-                  </div>
-                } 
-                variant="borderless" 
-                className="shadow-sm rounded-xl overflow-hidden"
-              >
-                <Table 
-                  columns={getProjectColumns()} 
-                  dataSource={projects} 
-                  pagination={{ pageSize: 8 }} 
-                  size="middle" 
-                  rowKey="id" 
-                  scroll={{ x: 'max-content' }}
-                  onRow={(record) => ({
-                    onClick: (e: any) => {
-                      if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-                      setSelectedProject(selectedProject?.id === record.id ? null : record);
-                    },
-                    className: `cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200 ${selectedProject?.id === record.id ? 'bg-orange-50/50 dark:bg-orange-950/20 border-l-4 border-orange-500 font-semibold' : ''}`
-                  })}
-                />
-              </Card>
-
-              {/* Project details and staff list drill-down */}
-              {selectedProject && (
-                <div className="p-5 bg-slate-50 dark:bg-zinc-900/50 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
-                  <div className="flex justify-between items-center mb-4 border-b border-slate-200 dark:border-zinc-800 pb-2">
-                    <div>
-                      <span className="text-[10px] text-orange-500 font-bold uppercase tracking-widest block">Drill-Down Project Level: Administrative Details & Team Appointed</span>
-                      <h4 className="text-sm font-bold text-slate-800 dark:text-zinc-200">
-                        📂 Scheme Ledger: {selectedProject.name} ({selectedProject.shortName})
-                      </h4>
-                    </div>
-                    <Button size="small" onClick={() => setSelectedProject(null)}>Close Project View</Button>
-                  </div>
-
-                  <Row gutter={[16, 16]}>
-                    <Col xs={24} md={8}>
-                      <Card size="small" title="Project Specifications" variant="borderless" className="shadow-none bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800">
-                        <div className="space-y-2 text-xs">
-                          <div><strong className="text-slate-400">PI / Scientist:</strong> <span className="font-semibold">{scientists.find(s => s.id === selectedProject.piId)?.name || 'Unknown'}</span></div>
-                          <div><strong className="text-slate-400">Type:</strong> <Tag color="orange" className="ml-1">{selectedProject.type}</Tag></div>
-                          <div><strong className="text-slate-400">Status:</strong> <Tag color={selectedProject.status === 'Completed' ? 'green' : 'blue'} className="ml-1">{selectedProject.status}</Tag></div>
-                          <div><strong className="text-slate-400">Budget Limit:</strong> <span className="font-semibold text-green-600">₹{selectedProject.budget.toLocaleString()}</span></div>
-                          <div><strong className="text-slate-400">Duration Scheduled:</strong> {selectedProject.durationDays} days</div>
-                          <div><strong className="text-slate-400">Pending Days Left:</strong> {selectedProject.pendingDays} days</div>
-                        </div>
-                      </Card>
-                    </Col>
-                    <Col xs={24} md={16}>
-                      <Card size="small" title="👥 Appointed Research Project Staff (Click row for full profile)" variant="borderless" className="shadow-none bg-white dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800">
-                        {(() => {
-                          const associatedStaff = projectStaff.filter(s => s.projectId === selectedProject.id);
-                          if (associatedStaff.length === 0) {
-                            return <Empty description="No research staff registered or appointed to this project." image={Empty.PRESENTED_IMAGE_SIMPLE} />;
-                          }
-
-                          return (
-                            <Table
-                              columns={getProjectStaffColumns().filter(col => col.key !== 'projectId')}
-                              dataSource={associatedStaff}
-                              pagination={{ pageSize: 5 }}
-                              size="small"
-                              rowKey="id"
-                              scroll={{ x: 'max-content' }}
-                              onRow={(staffRecord) => ({
-                                onClick: (e: any) => {
-                                  if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-                                  openStaffDetailsModal(staffRecord, 'pstaff');
-                                },
-                                className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
-                              })}
-                            />
-                          );
-                        })()}
-                      </Card>
-                    </Col>
-                  </Row>
-                </div>
-              )}
-            </div>
-          )
-        }] : []),
-        ...(visibility?.modules.projectStaff ? [{
-          key: 'pstaff',
-          label: (
-            <span>
-              <SolutionOutlined />
-              Project Research Staff
-            </span>
-          ),
-          children: (
-            <Card title="👥 Project Research Staff Profiles (Click row for full profile)" variant="borderless" className="shadow-sm rounded-xl overflow-hidden">
-              <Table 
-                columns={getProjectStaffColumns()} 
-                dataSource={projectStaff} 
-                pagination={{ pageSize: 8 }} 
-                size="middle" 
-                rowKey="id" 
-                scroll={{ x: 1200 }}
-                onRow={(record) => ({
-                  onClick: (e: any) => {
-                    if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-                    openStaffDetailsModal(record, 'pstaff');
-                  },
-                  className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
-                })}
-              />
-            </Card>
-          )
-        }] : []),
-        ...(visibility?.modules.permanentStaff ? [{
-          key: 'permanent',
-          label: (
-            <span>
-              <TeamOutlined />
-              Permanent Staff
-            </span>
-          ),
-          children: (
-            <Card title="💼 Permanent Staff Directory (Click row for full profile)" variant="borderless" className="shadow-sm rounded-xl overflow-hidden">
-              <Table 
-                columns={getPermanentStaffColumns()} 
-                dataSource={permanentStaff} 
-                pagination={{ pageSize: 8 }} 
-                size="middle" 
-                rowKey="id" 
-                scroll={{ x: 'max-content' }}
-                onRow={(record) => ({
-                  onClick: (e: any) => {
-                    if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-                    openStaffDetailsModal(record, 'perm');
-                  },
-                  className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
-                })}
-              />
-            </Card>
-          )
-        }] : []),
-        ...(visibility?.modules.ypConsultants ? [{
-          key: 'ypc',
-          label: (
-            <span>
-              <StarOutlined />
-              YP & Consultants
-            </span>
-          ),
-          children: (
-            <Card title="🌟 Young Professional & Consultant Staff (Click row for full profile)" variant="borderless" className="shadow-sm rounded-xl overflow-hidden">
-              <Table 
-                columns={getYPConsultantColumns()} 
-                dataSource={ypConsultants} 
-                pagination={{ pageSize: 8 }} 
-                size="middle" 
-                rowKey="id" 
-                scroll={{ x: 'max-content' }}
-                onRow={(record) => ({
-                  onClick: (e: any) => {
-                    if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-                    openStaffDetailsModal(record, 'ypc');
-                  },
-                  className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
-                })}
-              />
-            </Card>
-          )
-        }] : []),
-        {
-          key: 'salary-portal',
-          label: (
-            <span>
-              <PrinterOutlined />
-              Project Staff Salary Portal
-            </span>
-          ),
-          children: (
-            <SalaryPortalView />
-          )
-        }
-      ];
-
       return (
-        <div className="space-y-6">
-          {/* 1. Latest Announcements left to right marquee */}
-          {visibility?.modules.announcements && (
-            <div className="bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/40 rounded-xl p-2.5 flex items-center gap-3 overflow-hidden shadow-sm">
-              <div className="flex-shrink-0 flex items-center gap-2 bg-[#075E54] text-white px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider animate-pulse">
-                <NotificationOutlined /> Official Board Ticker
-              </div>
-              <div className="flex-1 overflow-hidden relative">
-                <div className="animate-marquee-rtl hover:[animation-play-state:paused] whitespace-nowrap inline-flex gap-12">
-                  {announcements.map((ann, idx) => (
-                    <span key={ann.id || idx} className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-200">
-                      <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                      {ann.title}
-                      {ann.fileName && (
-                        <a href={ann.fileData} target="_blank" rel="noreferrer" className="text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-extrabold ml-1">
-                          <FilePdfOutlined /> View Doc
-                        </a>
-                      )}
-                    </span>
-                  ))}
-                  {announcements.length === 0 && (
-                    <span className="text-xs text-slate-400 font-medium">No active institutional announcements listed today.</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+        <HomeDashboard
+          visibility={visibility}
+          announcements={announcements}
+          broadcasts={broadcasts}
+          events={events}
+          scientists={scientists}
+          projectStaff={projectStaff}
+          permanentStaff={permanentStaff}
+          ypConsultants={ypConsultants}
+          circulars={circulars}
+          forms={forms}
+          handleDownloadBase64File={handleDownloadBase64File}
+        />
+      );
+    }
 
-          {/* 2. Top-Level Layout Grid (Broadcast, Today's Seminars, Birthdays/Milestones) */}
-          <Row gutter={[16, 16]} className="items-stretch">
-            {/* Left: WhatsApp-theme Broadcast Bulletin Channel */}
-            {visibility?.modules.broadcast && (
-              <Col xs={24} lg={12} className="flex flex-col">
-                <BroadcastFeed
-                  messages={broadcasts}
-                  isAdmin={false}
-                  onSendMessage={async () => {}}
-                  onDeleteMessage={async () => {}}
-                  isWhatsAppTheme={true}
-                />
-              </Col>
-            )}
+    if (currentKey === 'public-scientists') {
+      return (
+        <PublicScientistsView
+          scientists={scientists}
+          projects={projects}
+          projectStaff={projectStaff}
+          visibility={visibility}
+          isAuthenticated={isAuthenticated}
+          onOpenDetails={openStaffDetailsModal}
+          handleDownloadBase64File={handleDownloadBase64File}
+        />
+      );
+    }
 
-            {/* Middle: Today's Events (Scientific Events & Seminars) */}
-            {visibility?.modules.events && (
-              <Col xs={24} md={12} lg={6} className="flex flex-col">
-                <Card 
-                  title={<span className="text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2"><span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span> TODAY'S SEMINARS & EVENTS</span>}
-                  variant="outlined"
-                  className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden"
-                  styles={{ body: { flex: 1, overflowY: 'auto', padding: '16px', maxHeight: '520px' } }}
-                >
-                  {events.length === 0 ? (
-                    <Empty description="No events scheduled today" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                  ) : (
-                    <div className="space-y-4 pr-1">
-                      {events.map((ev, index) => (
-                        <div key={ev.id || index} className="p-3 bg-slate-50 dark:bg-zinc-800/40 rounded-lg border border-slate-100 dark:border-zinc-800 flex flex-col gap-1.5 transition-all hover:bg-white dark:hover:bg-zinc-850 hover:shadow-sm">
-                          <div className="flex items-center gap-2 w-full justify-between">
-                            <span className="font-extrabold text-xs text-blue-600 dark:text-blue-400 line-clamp-1">{ev.title}</span>
-                            <Tag color="blue" className="m-0 text-[8px] font-extrabold border-0 px-1 py-0.5">{ev.time}</Tag>
-                          </div>
-                          <div className="text-[10px] text-slate-500 dark:text-zinc-400 flex items-center gap-1.5 flex-wrap">
-                            <span className="bg-slate-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[8px] font-bold text-slate-600 dark:text-zinc-400">
-                              {ev.date ? new Date(ev.date).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <CalendarOutlined className="text-slate-400 text-[9px]" /> <span className="font-semibold truncate">{ev.venue}</span>
-                            </span>
-                          </div>
-                          {ev.description && (
-                            <p className="text-[10px] text-slate-400 leading-relaxed m-0 italic line-clamp-2">
-                              {ev.description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              </Col>
-            )}
+    if (currentKey === 'public-pstaff') {
+      return (
+        <PublicProjectStaffView
+          projectStaff={projectStaff}
+          projects={projects}
+          scientists={scientists}
+          visibility={visibility}
+          isAuthenticated={isAuthenticated}
+          onOpenDetails={openStaffDetailsModal}
+        />
+      );
+    }
 
-            {/* Right: Birthdays & Celebrations & Service Milestones */}
-            {(visibility?.modules.birthdays || visibility?.modules.workAnniversaries) && (
-              <Col xs={24} md={12} lg={6} className="flex flex-col">
-                <Card 
-                  title={<span className="text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2"><span className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></span> CELEBRATIONS & MILESTONES</span>}
-                  variant="outlined"
-                  className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden"
-                  styles={{ body: { flex: 1, overflowY: 'auto', padding: '16px', maxHeight: '520px' } }}
-                >
-                  <div className="space-y-4 pr-1">
-                    {/* Birthdays Section */}
-                    {visibility?.modules.birthdays && (
-                      <div>
-                        <div className="text-[9px] font-bold text-pink-500 uppercase tracking-widest mb-2 border-b border-pink-100 dark:border-pink-950/40 pb-1 flex items-center gap-1.5">
-                          <span>🎈 Active Birthdays This Week</span>
-                          <span className="px-1.5 py-0.5 bg-pink-50 dark:bg-pink-950 text-pink-600 rounded text-[8px] font-bold">{localBirthdays.length}</span>
-                        </div>
-                        {localBirthdays.length === 0 ? (
-                          <div className="text-center py-4 text-[10px] text-slate-400 bg-slate-50 dark:bg-zinc-900/40 rounded-lg">No birthdays this week</div>
-                        ) : (
-                          <div className="space-y-2">
-                            {localBirthdays.map((item, index) => (
-                              <div key={index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-2 rounded-lg gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Avatar icon={<UserOutlined />} size="small" className="bg-pink-50 dark:bg-pink-950/40 text-pink-600 flex-shrink-0" />
-                                  <div className="min-w-0">
-                                    <div className="font-bold text-[10px] text-slate-800 dark:text-zinc-200 truncate">{item.name}</div>
-                                    <div className="text-[9px] text-slate-400 truncate">{item.designation}</div>
-                                  </div>
-                                </div>
-                                <span className="text-[9px] font-extrabold text-pink-600 flex-shrink-0">
-                                  {new Date(item.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+    if (currentKey === 'public-permanent') {
+      return (
+        <PublicPermanentStaffView
+          permanentStaff={permanentStaff}
+          visibility={visibility}
+          isAuthenticated={isAuthenticated}
+          onOpenDetails={openStaffDetailsModal}
+        />
+      );
+    }
 
-                    {/* Service Milestones Section */}
-                    {visibility?.modules.workAnniversaries && (
-                      <div>
-                        <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-2 border-b border-amber-100 dark:border-amber-950/40 pb-1 flex items-center gap-1.5">
-                          <span>🌟 Service Milestones</span>
-                          <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-950 text-amber-600 rounded text-[8px] font-bold">{localAnniversaries.length}</span>
-                        </div>
-                        {localAnniversaries.length === 0 ? (
-                          <div className="text-center py-4 text-[10px] text-slate-400 bg-slate-50 dark:bg-zinc-900/40 rounded-lg">No milestones this week</div>
-                        ) : (
-                          <div className="space-y-2">
-                            {localAnniversaries.map((item, index) => (
-                              <div key={index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-2 rounded-lg gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Avatar icon={<StarOutlined />} size="small" className="bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex-shrink-0" />
-                                  <div className="min-w-0">
-                                    <div className="font-bold text-[10px] text-slate-800 dark:text-zinc-200 truncate">{item.name}</div>
-                                    <div className="text-[9px] text-slate-400 truncate">{item.designation}</div>
-                                  </div>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                  <Tag color="orange" className="font-extrabold border-0 text-[8px] m-0 px-1 py-0">{item.years} Yrs</Tag>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </Col>
-            )}
-          </Row>
+    if (currentKey === 'public-ypc') {
+      return (
+        <PublicYPConsultantsView
+          ypConsultants={ypConsultants}
+          visibility={visibility}
+          isAuthenticated={isAuthenticated}
+          onOpenDetails={openStaffDetailsModal}
+        />
+      );
+    }
 
-          {/* 3. Standalone Institutional Office Circulars & Office Forms & Templates Card Row */}
-          {(visibility?.modules.circulars || visibility?.modules.forms) && (
-            (() => {
-              const filteredCirculars = circulars.filter(c => 
-                c.title.toLowerCase().includes(circularSearchText.toLowerCase()) ||
-                (c.fileName && c.fileName.toLowerCase().includes(circularSearchText.toLowerCase()))
-              );
-              const paginatedCirculars = filteredCirculars.slice((circularPage - 1) * 5, circularPage * 5);
-
-              const filteredForms = forms.filter(f => 
-                f.title.toLowerCase().includes(formSearchText.toLowerCase()) ||
-                (f.fileName && f.fileName.toLowerCase().includes(formSearchText.toLowerCase()))
-              );
-              const paginatedForms = filteredForms.slice((formPage - 1) * 5, formPage * 5);
-
-              return (
-                <Row gutter={[16, 16]} className="items-stretch">
-                  {visibility?.modules.circulars && (
-                    <Col xs={24} lg={12} className="flex flex-col">
-                      <Card 
-                        title={
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2 py-1">
-                            <span className="text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2">
-                              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                              📄 INSTITUTIONAL OFFICE CIRCULARS
-                            </span>
-                            <Input
-                              placeholder="Search circulars..."
-                              size="small"
-                              prefix={<SearchOutlined className="text-slate-400" />}
-                              value={circularSearchText}
-                              onChange={(e) => { setCircularSearchText(e.target.value); setCircularPage(1); }}
-                              style={{ width: '180px' }}
-                              className="rounded-lg text-xs"
-                              allowClear
-                            />
-                          </div>
-                        }
-                        variant="outlined"
-                        className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden animate-fadeIn"
-                        styles={{ body: { flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' } }}
-                      >
-                        <div className="flex-1 space-y-3 min-h-[300px]">
-                          {paginatedCirculars.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                              <Empty description="No matching circulars found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                            </div>
-                          ) : (
-                            paginatedCirculars.map((item, index) => (
-                              <div key={item.id || index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3 rounded-lg gap-3 transition-all hover:bg-slate-50 dark:hover:bg-zinc-800/40 hover:shadow-sm">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <Avatar icon={<FilePdfOutlined />} size="small" className="bg-red-50 dark:bg-red-950/40 text-red-500 flex-shrink-0" />
-                                  <div className="min-w-0">
-                                    <div className="font-bold text-[11px] text-slate-800 dark:text-zinc-200 leading-snug line-clamp-2">{item.title}</div>
-                                    <div className="text-[9px] text-slate-400 mt-0.5">Published: {item.uploadDate}</div>
-                                  </div>
-                                </div>
-                                <Button 
-                                  type="primary" 
-                                  size="small"
-                                  className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border-0 rounded-md"
-                                  icon={<DownloadOutlined />}
-                                  onClick={() => handleDownloadBase64File(item.fileName, item.fileData)}
-                                >
-                                  View Doc
-                                </Button>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        {filteredCirculars.length > 5 && (
-                          <div className="mt-4 flex justify-end border-t border-slate-100 dark:border-zinc-800 pt-3">
-                            <Pagination 
-                              size="small" 
-                              current={circularPage} 
-                              total={filteredCirculars.length} 
-                              pageSize={5} 
-                              onChange={(page) => setCircularPage(page)}
-                              showSizeChanger={false}
-                            />
-                          </div>
-                        )}
-                      </Card>
-                    </Col>
-                  )}
-                  {visibility?.modules.forms && (
-                    <Col xs={24} lg={12} className="flex flex-col">
-                      <Card 
-                        title={
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2 py-1">
-                            <span className="text-xs font-extrabold text-slate-700 dark:text-zinc-300 flex items-center gap-2">
-                              <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
-                              📝 OFFICE FORMS & TEMPLATES
-                            </span>
-                            <Input
-                              placeholder="Search forms..."
-                              size="small"
-                              prefix={<SearchOutlined className="text-slate-400" />}
-                              value={formSearchText}
-                              onChange={(e) => { setFormSearchText(e.target.value); setFormPage(1); }}
-                              style={{ width: '180px' }}
-                              className="rounded-lg text-xs"
-                              allowClear
-                            />
-                          </div>
-                        }
-                        variant="outlined"
-                        className="shadow-md rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden animate-fadeIn"
-                        styles={{ body: { flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' } }}
-                      >
-                        <div className="flex-1 space-y-3 min-h-[300px]">
-                          {paginatedForms.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                              <Empty description="No matching forms found" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-                            </div>
-                          ) : (
-                            paginatedForms.map((item, index) => (
-                              <div key={item.id || index} className="flex items-center justify-between border border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3 rounded-lg gap-3 transition-all hover:bg-slate-50 dark:hover:bg-zinc-800/40 hover:shadow-sm">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <Avatar icon={<SolutionOutlined />} size="small" className="bg-purple-50 dark:bg-purple-950/40 text-purple-500 flex-shrink-0" />
-                                  <div className="min-w-0">
-                                    <div className="font-bold text-[11px] text-slate-800 dark:text-zinc-200 leading-snug line-clamp-2">{item.title}</div>
-                                    <div className="text-[9px] text-slate-400 mt-0.5">Published: {item.uploadDate}</div>
-                                  </div>
-                                </div>
-                                <Button 
-                                  type="primary" 
-                                  size="small"
-                                  className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border-0 rounded-md"
-                                  icon={<DownloadOutlined />}
-                                  onClick={() => handleDownloadBase64File(item.fileName, item.fileData)}
-                                >
-                                  Download
-                                </Button>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        {filteredForms.length > 5 && (
-                          <div className="mt-4 flex justify-end border-t border-slate-100 dark:border-zinc-800 pt-3">
-                            <Pagination 
-                              size="small" 
-                              current={formPage} 
-                              total={filteredForms.length} 
-                              pageSize={5} 
-                              onChange={(page) => setFormPage(page)}
-                              showSizeChanger={false}
-                            />
-                          </div>
-                        )}
-                      </Card>
-                    </Col>
-                  )}
-                </Row>
-              );
-            })()
-          )}
-
-          {/* 4. Below Grid: Beautiful Tabbed Navigation */}
-          <Tabs 
-            activeKey={dashboardTab} 
-            onChange={(key) => {
-              setDashboardTab(key);
-              setSelectedScientist(null);
-              setSelectedProject(null);
-            }} 
-            items={tabItems} 
-            className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm"
-          />
+    if (currentKey === 'public-salary-portal') {
+      return (
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+          <SalaryPortalView />
         </div>
       );
     }
@@ -1861,6 +1238,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                         <Col span={12}>
                           <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportYPConsultantCSV}>YP & Consultants</Button>
                         </Col>
+                        <Col span={24}>
+                          <Button size="small" block className="text-[10px] rounded-lg text-emerald-700 dark:text-emerald-400 font-bold border-emerald-200 dark:border-emerald-950" icon={<DownloadOutlined />} onClick={exportProjectsCSV}>Project Details (UCs, Budget, PI)</Button>
+                        </Col>
                       </Row>
                     </div>
 
@@ -1869,9 +1249,12 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       block 
                       icon={<DownloadOutlined />} 
                       className="text-[11px] rounded-lg font-bold text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50" 
-                      onClick={exportAllStaffIndividually}
+                      onClick={() => {
+                        exportAllStaffIndividually();
+                        setTimeout(() => exportProjectsCSV(), 1000);
+                      }}
                     >
-                      Download All 4 CSVs (Separate Files)
+                      Download All 5 CSVs (Separate Files)
                     </Button>
 
                     <Divider className="my-1.5" />
@@ -1891,8 +1274,45 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       </Button>
                     </div>
 
+                    <Divider className="my-1.5" />
+
+                    <div>
+                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider mb-2">
+                        Option 3: Security & Database Backup
+                      </div>
+                      <Button 
+                        type="primary" 
+                        danger
+                        block 
+                        icon={<DatabaseOutlined />} 
+                        className="text-xs rounded-lg font-extrabold flex items-center justify-center gap-1.5 border-0 bg-red-600 hover:bg-red-700" 
+                        onClick={async () => {
+                          const hide = message.loading('Taking database backup...', 0);
+                          try {
+                            const data = await apiService.getDatabaseBackup();
+                            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.setAttribute('href', url);
+                            link.setAttribute('download', `NIHR_Intranet_Database_Backup_${new Date().toISOString().split('T')[0]}.json`);
+                            link.style.visibility = 'hidden';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            message.success('Full secure database backup downloaded successfully!');
+                          } catch (err) {
+                            message.error('Failed to take database backup.');
+                          } finally {
+                            hide();
+                          }
+                        }}
+                      >
+                        Download Full Database Backup (.JSON)
+                      </Button>
+                    </div>
+
                     <p className="text-[9px] text-slate-400 dark:text-zinc-500 m-0 leading-relaxed italic bg-slate-50 dark:bg-zinc-950 p-2 rounded-lg border border-slate-100 dark:border-zinc-900">
-                      * This master sheet groups all personnel by category (Scientists, Permanent, Project, and YPs) and exports 100% of fields, skipping none.
+                      * Security note: Backups can only be generated by Super Admins. They contain the entire state of registry entries, pending approvals, circulars, and credentials securely.
                     </p>
                   </div>
                 </Card>
@@ -1940,10 +1360,152 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       dataSource = projects;
       modalType = 'project';
     } else if (currentKey === 'admin-project-staff') {
-      title = '👥 Project Research Staff';
-      columns = getProjectStaffColumns();
-      dataSource = projectStaff;
-      modalType = 'pstaff';
+      const filteredActive = filterDataset(projectStaff);
+      const filteredPending = pendingProjectStaff.filter(p => {
+        if (!searchText) return true;
+        const searchLower = searchText.toLowerCase();
+        return (p.name || '').toLowerCase().includes(searchLower) ||
+               (p.email || '').toLowerCase().includes(searchLower) ||
+               (p.phone || '').toLowerCase().includes(searchLower);
+      });
+
+      const pendingColumns = [
+        { title: 'Full Name', dataIndex: 'name', key: 'name', className: 'font-bold' },
+        { title: 'Designation', dataIndex: 'designation', key: 'designation' },
+        { title: 'Email Address', dataIndex: 'email', key: 'email' },
+        { title: 'Phone Number', dataIndex: 'phone', key: 'phone' },
+        { title: 'Linked Project', dataIndex: 'projectId', key: 'projectId', render: (id: string) => projects.find(p => p.id === id)?.shortName || 'None' },
+        { title: 'Principal Investigator', dataIndex: 'scientistId', key: 'scientistId', render: (id: string) => scientists.find(s => s.id === id)?.name || '-' },
+        { title: 'Submission Date', dataIndex: 'id', key: 'submissionDate', render: (id: string) => {
+          const timestamp = parseInt(id.replace('pending-', ''), 10);
+          return isNaN(timestamp) ? 'Recent' : new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }},
+        {
+          title: 'Review Operations',
+          key: 'operations',
+          render: (_: any, rec: any) => (
+            <Space size="middle">
+              <Button 
+                type="primary" 
+                size="small" 
+                className="bg-green-600 hover:bg-green-700 font-semibold text-xs rounded-lg border-0"
+                onClick={async () => {
+                  try {
+                    await apiService.approvePendingProjectStaff(rec.id);
+                    message.success(`Approved successfully! ${rec.name} has been added to Active Ledger with a TEMP employee code.`);
+                    fetchAllData();
+                  } catch (err) {
+                    message.error('Failed to approve registration.');
+                  }
+                }}
+              >
+                Approve & Allocate Code
+              </Button>
+              <Popconfirm 
+                title="Reject this registration application?" 
+                onConfirm={async () => {
+                  try {
+                    await apiService.rejectPendingProjectStaff(rec.id);
+                    message.success('Registration application rejected/cleared.');
+                    fetchAllData();
+                  } catch (err) {
+                    message.error('Failed to reject registration.');
+                  }
+                }}
+                okText="Yes, Reject"
+                cancelText="Cancel"
+              >
+                <Button type="primary" danger size="small" className="font-semibold text-xs rounded-lg">
+                  Reject
+                </Button>
+              </Popconfirm>
+            </Space>
+          )
+        }
+      ];
+
+      return (
+        <Card
+          variant="borderless"
+          className="shadow-sm rounded-xl overflow-hidden"
+          title={
+            <div className="flex justify-between items-center flex-wrap gap-4 py-1">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="font-bold text-base text-slate-800 dark:text-zinc-100">👥 Project Research Staff Profiles</span>
+                <Radio.Group 
+                  value={activeProjectStaffTab} 
+                  onChange={(e) => setActiveProjectStaffTab(e.target.value)}
+                  size="small"
+                  className="rounded-lg"
+                >
+                  <Radio.Button value="ledger">Active Ledger ({projectStaff.length})</Radio.Button>
+                  <Radio.Button value="pending">
+                    Pending Approvals 
+                    {pendingProjectStaff.length > 0 && (
+                      <Badge count={pendingProjectStaff.length} className="ms-2" offset={[4, -2]} />
+                    )}
+                  </Radio.Button>
+                </Radio.Group>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Search resources..."
+                  prefix={<SearchOutlined className="text-slate-400" />}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                  style={{ width: 220 }}
+                  className="rounded-lg text-xs"
+                />
+                {activeProjectStaffTab === 'ledger' && (
+                  <Button 
+                    type="primary" 
+                    icon={<PlusOutlined />} 
+                    className="rounded-lg text-xs font-semibold"
+                    onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}
+                  >
+                    Add New Record
+                  </Button>
+                )}
+              </div>
+            </div>
+          }
+        >
+          {activeProjectStaffTab === 'ledger' ? (
+            <Table 
+              columns={getProjectStaffColumns()} 
+              dataSource={filteredActive} 
+              pagination={{ pageSize: 10 }}
+              size="middle"
+              rowKey="id"
+              scroll={{ x: 'max-content' }}
+              onRow={(record) => ({
+                onClick: (e: any) => {
+                  if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
+                  openStaffDetailsModal(record, 'pstaff');
+                },
+                className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
+              })}
+            />
+          ) : (
+            <Table 
+              columns={pendingColumns} 
+              dataSource={filteredPending} 
+              pagination={{ pageSize: 10 }}
+              size="middle"
+              rowKey="id"
+              scroll={{ x: 'max-content' }}
+              onRow={(record) => ({
+                onClick: (e: any) => {
+                  if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
+                  openStaffDetailsModal(record, 'pstaff');
+                },
+                className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
+              })}
+            />
+          )}
+        </Card>
+      );
     } else if (currentKey === 'admin-permanent-staff') {
       title = '💼 Permanent Staff Registry';
       columns = getPermanentStaffColumns();
@@ -2085,131 +1647,24 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
   return (
     <Layout className="min-h-screen bg-[#F8FAFC] dark:bg-zinc-950 transition-colors duration-300">
-        {/* Responsive Header */}
-        <Header className="bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 px-4 md:px-6 flex justify-between items-center sticky top-0 z-50 h-14">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#005EB8] rounded flex items-center justify-center overflow-hidden font-bold text-white text-xs">
-              <img src="https://icmr.gov.in/images/icmr_logo.png" alt="Logo" className="w-full h-full object-contain p-1" onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} />
-              <span className="italic">NIHR</span>
-            </div>
-            <div className="flex flex-col leading-none">
-              <h1 className="text-sm md:text-base font-semibold tracking-tight text-[#005EB8] dark:text-blue-400 m-0">
-                Intranet <span className="hidden sm:inline text-slate-400 dark:text-zinc-500 font-normal ml-1">| Project & Staff Ledger</span>
-              </h1>
-            </div>
-          </div>
-
-          <Space size="middle">
-            {/* Theme Toggle Button */}
-            <Button 
-              type="text" 
-              icon={themeMode === 'dark' ? <BulbFilled className="text-yellow-500" /> : <BulbOutlined />} 
-              onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
-              className="text-slate-600 dark:text-zinc-300"
-            />
-
-            <Button 
-              type={currentKey === 'complaints' ? 'primary' : 'default'} 
-              icon={<CustomerServiceOutlined />} 
-              className="rounded-lg text-xs font-semibold"
-              onClick={() => {
-                if (currentKey === 'complaints') {
-                  setCurrentKey(isAuthenticated ? 'admin-dashboard' : 'public-dashboard');
-                } else {
-                  setCurrentKey('complaints');
-                }
-              }}
-            >
-              {currentKey === 'complaints' ? 'Back to Intranet' : 'Complaints Desk'}
-            </Button>
-
-            {/* Public/Admin Mode toggler */}
-            {!isAuthenticated ? (
-              <Button 
-                type="primary" 
-                icon={<LoginOutlined />} 
-                className="rounded-lg text-xs font-semibold"
-                onClick={() => { setShowLoginModal(true); loadCaptcha(); }}
-              >
-                Super Admin Login
-              </Button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Tag color="blue" className="m-0 border-0 text-xs px-2.5 py-1.5 font-bold uppercase tracking-wider flex items-center gap-1">
-                  <UserOutlined /> {currentAdmin?.name} (Admin)
-                </Tag>
-                <Button 
-                  danger 
-                  icon={<LogoutOutlined />} 
-                  className="rounded-lg text-xs font-semibold"
-                  onClick={handleLogout}
-                >
-                  Logout
-                </Button>
-              </div>
-            )}
-          </Space>
-        </Header>
+        <AppHeader
+          currentKey={currentKey}
+          setCurrentKey={setCurrentKey}
+          isAuthenticated={isAuthenticated}
+          currentAdmin={currentAdmin}
+          handleLogout={handleLogout}
+          themeMode={themeMode}
+          setThemeMode={setThemeMode}
+          visibility={visibility}
+          setShowLoginModal={setShowLoginModal}
+          loadCaptcha={loadCaptcha}
+        />
 
         {/* Core Layout Grid */}
         <Layout>
           {/* Centered Main Area */}
           <Layout className="p-4 md:p-6 overflow-x-hidden bg-[#F8FAFC] dark:bg-zinc-950">
             <Content className="w-full min-h-[500px]">
-              {isAuthenticated && (
-                <div className="mb-6 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 p-2 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 px-3">
-                    <span className="w-2.5 h-2.5 bg-[#005EB8] rounded-full animate-pulse"></span>
-                    <span className="text-xs font-extrabold text-slate-800 dark:text-zinc-200 uppercase tracking-wider">Super Admin Console</span>
-                  </div>
-                  <Menu
-                    mode="horizontal"
-                    selectedKeys={[currentKey]}
-                    onClick={({ key }) => {
-                      if (key === 'public-overview') {
-                        setCurrentKey('public-dashboard');
-                        setDashboardTab('scientists');
-                        setSelectedScientist(null);
-                        setSelectedProject(null);
-                      } else {
-                        setCurrentKey(key);
-                      }
-                    }}
-                    className="border-b-0 flex-1 justify-end font-semibold text-xs text-slate-600 dark:text-zinc-300 bg-transparent dark:bg-transparent"
-                    style={{ borderBottom: 'none' }}
-                    items={[
-                      { key: 'admin-dashboard', icon: <AppstoreOutlined />, label: 'Admin Dashboard' },
-                      {
-                        key: 'registries',
-                        icon: <TeamOutlined />,
-                        label: 'Administrative Registries',
-                        children: [
-                          { key: 'admin-scientists', icon: <UserOutlined />, label: 'Scientists Registry' },
-                          { key: 'admin-projects', icon: <ProjectOutlined />, label: 'Projects Ledger' },
-                          { key: 'admin-project-staff', icon: <SolutionOutlined />, label: 'Project Staff' },
-                          { key: 'admin-permanent-staff', icon: <TeamOutlined />, label: 'Permanent Staff' },
-                          { key: 'admin-yp-consultants', icon: <StarOutlined />, label: 'YP & Consultants' },
-                          { key: 'admin-salaries', icon: <PrinterOutlined />, label: 'Staff Salaries (CSV)' },
-                        ]
-                      },
-                      {
-                        key: 'library',
-                        icon: <FilePdfOutlined />,
-                        label: 'Institutional Library',
-                        children: [
-                          { key: 'admin-circulars', icon: <FilePdfOutlined />, label: 'Office Circulars' },
-                          { key: 'admin-forms', icon: <FilePdfOutlined />, label: 'Office Forms Templates' },
-                          { key: 'admin-events', icon: <CalendarOutlined />, label: 'Institutional Events' },
-                        ]
-                      },
-                      { key: 'admin-visibility', icon: <SettingOutlined />, label: 'Visibility Control' },
-                      { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Grievance / Complaint Desk' },
-                      { key: 'admin-accounts', icon: <KeyOutlined />, label: 'Super Admin Accounts' },
-                      { key: 'public-overview', icon: <TeamOutlined />, label: 'View Public Dashboard' }
-                    ]}
-                  />
-                </div>
-              )}
               {renderContentView()}
             </Content>
             
@@ -2593,32 +2048,38 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     ✉️ Contact & Communications
                   </h4>
                   <Row gutter={[12, 12]}>
-                    <Col xs={24} sm={12}>
-                      <span className="block text-[10px] text-slate-400 font-medium">Primary Email</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                        {renderMaskedField(viewDetailRecord.govtEmail || viewDetailRecord.email, isAuthenticated || !!visibility?.fields.email)}
-                      </span>
-                    </Col>
-                    {viewDetailRecord.personalEmail && (
+                    {(isAuthenticated || !!visibility?.fields.email) && (
                       <Col xs={24} sm={12}>
-                        <span className="block text-[10px] text-slate-400 font-medium">Personal Email</span>
+                        <span className="block text-[10px] text-slate-400 font-medium">Primary Email</span>
                         <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                          {renderMaskedField(viewDetailRecord.personalEmail, isAuthenticated)}
+                          {renderMaskedField(viewDetailRecord.govtEmail || viewDetailRecord.email, true)}
                         </span>
                       </Col>
                     )}
-                    <Col xs={12} sm={12}>
-                      <span className="block text-[10px] text-slate-400 font-medium">Phone / Mobile</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                        {renderMaskedField(viewDetailRecord.phone, isAuthenticated || !!visibility?.fields.phone)}
-                      </span>
-                    </Col>
-                    <Col xs={12} sm={12}>
-                      <span className="block text-[10px] text-slate-400 font-medium">Emergency Contact</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                        {renderMaskedField(viewDetailRecord.emergencyContact, isAuthenticated || !!visibility?.fields.phone, '🔒 Masked')}
-                      </span>
-                    </Col>
+                    {viewDetailRecord.personalEmail && isAuthenticated && (
+                      <Col xs={24} sm={12}>
+                        <span className="block text-[10px] text-slate-400 font-medium">Personal Email</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          {renderMaskedField(viewDetailRecord.personalEmail, true)}
+                        </span>
+                      </Col>
+                    )}
+                    {(isAuthenticated || !!visibility?.fields.phone) && (
+                      <Col xs={12} sm={12}>
+                        <span className="block text-[10px] text-slate-400 font-medium">Phone / Mobile</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          {renderMaskedField(viewDetailRecord.phone, true)}
+                        </span>
+                      </Col>
+                    )}
+                    {(isAuthenticated || !!visibility?.fields.phone) && viewDetailRecord.emergencyContact && (
+                      <Col xs={12} sm={12}>
+                        <span className="block text-[10px] text-slate-400 font-medium">Emergency Contact</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          {renderMaskedField(viewDetailRecord.emergencyContact, true)}
+                        </span>
+                      </Col>
+                    )}
                   </Row>
                 </Col>
 
@@ -2628,12 +2089,14 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     👤 Personal Identity & Security IDs
                   </h4>
                   <Row gutter={[12, 12]}>
-                    <Col xs={12} sm={8}>
-                      <span className="block text-[10px] text-slate-400 font-medium">Date of Birth</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                        {renderMaskedField(viewDetailRecord.dob, isAuthenticated || !!visibility?.fields.dob)}
-                      </span>
-                    </Col>
+                    {(isAuthenticated || !!visibility?.fields.dob) && (
+                      <Col xs={12} sm={8}>
+                        <span className="block text-[10px] text-slate-400 font-medium">Date of Birth</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          {renderMaskedField(viewDetailRecord.dob, true)}
+                        </span>
+                      </Col>
+                    )}
                     <Col xs={12} sm={8}>
                       <span className="block text-[10px] text-slate-400 font-medium">Gender</span>
                       <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
@@ -2646,29 +2109,35 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                         {viewDetailRecord.bloodGroup || '-'}
                       </span>
                     </Col>
-                    <Col xs={24} sm={12}>
-                      <span className="block text-[10px] text-slate-400 font-medium">Aadhaar Card Number</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                        {renderMaskedField(viewDetailRecord.aadhaarNumber, isAuthenticated || !!visibility?.fields.aadhaar, '🔒 Restricted Masked')}
-                      </span>
-                    </Col>
-                    <Col xs={24} sm={12}>
-                      <span className="block text-[10px] text-slate-400 font-medium">Permanent Account Number (PAN)</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                        {renderMaskedField(viewDetailRecord.panNumber, isAuthenticated || !!visibility?.fields.pan, '🔒 Restricted Masked')}
-                      </span>
-                    </Col>
-                    <Col xs={24}>
-                      <span className="block text-[10px] text-slate-400 font-medium">Residential Home Address</span>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                        {renderMaskedField(viewDetailRecord.address, isAuthenticated || !!visibility?.fields.address, '🔒 Restricted Masked')}
-                      </span>
-                    </Col>
+                    {(isAuthenticated || !!visibility?.fields.aadhaar) && viewDetailRecord.aadhaarNumber && (
+                      <Col xs={24} sm={12}>
+                        <span className="block text-[10px] text-slate-400 font-medium">Aadhaar Card Number</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          {renderMaskedField(viewDetailRecord.aadhaarNumber, true)}
+                        </span>
+                      </Col>
+                    )}
+                    {(isAuthenticated || !!visibility?.fields.pan) && viewDetailRecord.panNumber && (
+                      <Col xs={24} sm={12}>
+                        <span className="block text-[10px] text-slate-400 font-medium">Permanent Account Number (PAN)</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          {renderMaskedField(viewDetailRecord.panNumber, true)}
+                        </span>
+                      </Col>
+                    )}
+                    {(isAuthenticated || !!visibility?.fields.address) && viewDetailRecord.address && (
+                      <Col xs={24}>
+                        <span className="block text-[10px] text-slate-400 font-medium">Residential Home Address</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                          {renderMaskedField(viewDetailRecord.address, true)}
+                        </span>
+                      </Col>
+                    )}
                   </Row>
                 </Col>
 
                 {/* Section 4: Bank Details */}
-                {viewDetailRecord.accountNumber && (
+                {(isAuthenticated || !!visibility?.fields.bankDetails) && viewDetailRecord.accountNumber && (
                   <Col xs={24}>
                     <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
                       🏦 Official Salary Disbursement Bank Account
@@ -2677,21 +2146,76 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       <Col xs={24} sm={8}>
                         <span className="block text-[10px] text-slate-400 font-medium">Bank Name</span>
                         <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                          {renderMaskedField(viewDetailRecord.bankName, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 Restricted Masked')}
+                          {renderMaskedField(viewDetailRecord.bankName, true)}
                         </span>
                       </Col>
                       <Col xs={24} sm={8}>
                         <span className="block text-[10px] text-slate-400 font-medium">Account Number</span>
                         <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                          {renderMaskedField(viewDetailRecord.accountNumber, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 Restricted Masked')}
+                          {renderMaskedField(viewDetailRecord.accountNumber, true)}
                         </span>
                       </Col>
                       <Col xs={24} sm={8}>
                         <span className="block text-[10px] text-slate-400 font-medium">IFSC Routing Code</span>
                         <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-                          {renderMaskedField(viewDetailRecord.ifscCode, isAuthenticated || !!visibility?.fields.bankDetails, '🔒 Restricted Masked')}
+                          {renderMaskedField(viewDetailRecord.ifscCode, true)}
                         </span>
                       </Col>
+                    </Row>
+                  </Col>
+                )}
+
+                {/* Section 4.5: Family & Marital Status (For Project Staff) */}
+                {viewDetailType === 'pstaff' && (viewDetailRecord.fatherName || viewDetailRecord.motherName || viewDetailRecord.maritalStatus) && (
+                  <Col xs={24}>
+                    <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
+                      👨‍👩‍👦 Family & Marital Details
+                    </h4>
+                    <Row gutter={[12, 12]}>
+                      {viewDetailRecord.fatherName && (
+                        <Col xs={12} sm={8}>
+                          <span className="block text-[10px] text-slate-400 font-medium">Father's Name</span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.fatherName}</span>
+                        </Col>
+                      )}
+                      {viewDetailRecord.fatherPhone && (
+                        <Col xs={12} sm={8}>
+                          <span className="block text-[10px] text-slate-400 font-medium">Father's Mobile</span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.fatherPhone}</span>
+                        </Col>
+                      )}
+                      {viewDetailRecord.motherName && (
+                        <Col xs={12} sm={8}>
+                          <span className="block text-[10px] text-slate-400 font-medium">Mother's Name</span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.motherName}</span>
+                        </Col>
+                      )}
+                      {viewDetailRecord.motherPhone && (
+                        <Col xs={12} sm={8}>
+                          <span className="block text-[10px] text-slate-400 font-medium">Mother's Mobile</span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.motherPhone}</span>
+                        </Col>
+                      )}
+                      <Col xs={12} sm={8}>
+                        <span className="block text-[10px] text-slate-400 font-medium">Marital Status</span>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.maritalStatus || 'Single'}</span>
+                      </Col>
+                      {viewDetailRecord.maritalStatus === 'Married' && (
+                        <>
+                          {viewDetailRecord.spouseName && (
+                            <Col xs={12} sm={8}>
+                              <span className="block text-[10px] text-slate-400 font-medium">Spouse Name</span>
+                              <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.spouseName}</span>
+                            </Col>
+                          )}
+                          {viewDetailRecord.spousePhone && (
+                            <Col xs={12} sm={8}>
+                              <span className="block text-[10px] text-slate-400 font-medium">Spouse Mobile</span>
+                              <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.spousePhone}</span>
+                            </Col>
+                          )}
+                        </>
+                      )}
                     </Row>
                   </Col>
                 )}

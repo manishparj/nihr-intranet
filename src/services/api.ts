@@ -15,7 +15,10 @@ const client = axios.create({
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('nihr_token');
   if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+    const hasAuth = config.headers.Authorization || config.headers.authorization;
+    if (!hasAuth) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });
@@ -319,6 +322,29 @@ export const apiService = {
   },
   updateSalarySlip: async (id: string, data: any) => {
     const res = await client.put<{ success: boolean; salarySlip: SalarySlip }>(`/salaries/${id}`, data);
+    return res.data;
+  },
+  
+  // Pending Project Staff Self-Registration
+  getPendingProjectStaff: async () => {
+    const res = await client.get<any[]>('/pending-project-staff');
+    return res.data;
+  },
+  submitPendingProjectStaff: async (data: any) => {
+    const res = await client.post<any>('/pending-project-staff', data);
+    return res.data;
+  },
+  approvePendingProjectStaff: async (id: string) => {
+    const res = await client.post<{ success: boolean; approvedRecord: any }>(`/pending-project-staff/${id}/approve`);
+    return res.data;
+  },
+  rejectPendingProjectStaff: async (id: string) => {
+    const res = await client.post<{ success: boolean }>(`/pending-project-staff/${id}/reject`);
+    return res.data;
+  },
+  // Security Backup
+  getDatabaseBackup: async () => {
+    const res = await client.get<any>('/backup');
     return res.data;
   }
 };

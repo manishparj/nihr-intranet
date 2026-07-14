@@ -164,6 +164,69 @@
       "icmrExpMonths": 24,
       "nonIcmrExpMonths": 0,
       "totalExpMonths": 24
+    },
+    {
+      "projectId": "proj-1",
+      "scientistId": "sci-1",
+      "name": "Manish T",
+      "dob": "2026-07-13",
+      "doj": "2026-07-16",
+      "designation": "fsa acfsad",
+      "email": "sfasf@gmail.com",
+      "phone": "9856989632",
+      "gender": "Male",
+      "bloodGroup": "AB+",
+      "emergencyContact": "9856932145",
+      "address": "Hello ",
+      "aadhaarNumber": "895698456321",
+      "panNumber": "CIX9984563",
+      "bankName": "SBI",
+      "accountNumber": "98563214569",
+      "ifscCode": "SBIN8845D",
+      "departmentLocation": "epi",
+      "roomNumber": "12",
+      "educationalQualification": "BTECG",
+      "contractPeriod": 12,
+      "category": "UR",
+      "status": "Active",
+      "lastWorkingDate": "",
+      "leavingReason": "",
+      "noDuesCleared": false,
+      "employeeCode": "TEMP-10002",
+      "previousIcmrExperience": [
+        {
+          "id": "exp-1784020467330",
+          "instituteName": "ICMR NIV ",
+          "designation": "JRF",
+          "fromDate": "2024-02-14",
+          "toDate": "2026-07-13"
+        },
+        {
+          "id": "exp-1784020485937",
+          "instituteName": "NIN HYD",
+          "designation": "TA",
+          "fromDate": "2021-01-07",
+          "toDate": "2026-07-17"
+        }
+      ],
+      "previousNonIcmrExperience": [
+        {
+          "id": "exp-1784020505209",
+          "instituteName": "aiims",
+          "designation": "SAD",
+          "fromDate": "2021-01-14",
+          "toDate": "2026-03-19"
+        }
+      ],
+      "motherName": "dsfasf",
+      "motherPhone": "1236589632",
+      "fatherName": "dfdvdsf",
+      "fatherPhone": "1236547896",
+      "maritalStatus": "Married",
+      "spouseName": "dfdafdf",
+      "spousePhone": "6956985632",
+      "photoUrl": "/uploads/photos/S.2.jpg",
+      "id": "pstaff-1784020587502"
     }
   ],
   "permanentStaff": [
@@ -1205,6 +1268,24 @@
       "text": "fsfsf",
       "timestamp": "2026-07-10T10:31:10.383Z",
       "senderName": "Super Admin"
+    },
+    {
+      "id": "bc-1784003700564",
+      "text": "asdadad",
+      "timestamp": "2026-07-14T04:35:00.564Z",
+      "senderName": "Super Admin"
+    },
+    {
+      "id": "bc-1784003705215",
+      "text": "sadfs",
+      "timestamp": "2026-07-14T04:35:05.215Z",
+      "senderName": "Super Admin"
+    },
+    {
+      "id": "bc-1784003715732",
+      "text": "sdsd",
+      "timestamp": "2026-07-14T04:35:15.732Z",
+      "senderName": "Super Admin"
     }
   ],
   "visibility": {
@@ -1661,6 +1742,46 @@
         "Leave Without Pay Deduction": "₹1,333",
         "Net Pay": "₹22,667"
       }
+    },
+    {
+      "id": "sal-1783938276623-h4w98",
+      "name": "Manish Prajapati",
+      "employeeCode": "TEMP-10012",
+      "mobile": "9979271578",
+      "aadhaarNumber": "486652916614",
+      "month": "February",
+      "year": "2026",
+      "uploadedAt": "2026-07-13T10:24:36.623Z",
+      "details": {
+        "Employee Code": "TEMP-10012",
+        "Employee Name": "Manish Prajapati",
+        "Designation": "Technical Assistant",
+        "Date of Joining": "10/2/2024",
+        "Tenure Up To": "30-11-2028",
+        "Project Name": "Efficacy of Cytb Test in Field Settings for Active Case Finding of Tuberculosis",
+        "Scientist Name": "Dr. Ananya Sen",
+        "Scientist Designation": "Scientist E",
+        "Address": "Adyar, Chennai",
+        "PAN Number": "VUTSR9876Q",
+        "Bank Name": "Indian Bank",
+        "Account Number": "987654322",
+        "IFSC Code": "IDIB000M002",
+        "Basic Pay": "₹50,000",
+        "HRA": "₹10,000",
+        "Days in Month": "28",
+        "Total Present Days": "28",
+        "Balance Leave Brought": "0",
+        "Leave Credit": "1.5",
+        "Total Leave": "1.5",
+        "Leave Availed": "3.5",
+        "Leave Balance": "-2",
+        "Leave Without Pay": "3",
+        "Gross Remuneration": "₹60,000",
+        "Income Tax Deduction": "₹0",
+        "Leave Without Pay Deduction": "₹2,000",
+        "Net Pay": "₹22,667"
+      }
     }
-  ]
+  ],
+  "pendingProjectStaff": []
 }

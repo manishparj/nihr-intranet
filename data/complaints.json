@@ -129,6 +129,24 @@
       "createdAt": "2026-07-10T08:59:13.278Z",
       "updatedAt": "2026-07-10T09:53:50.009Z",
       "assignedStaff": "Shankal Lal "
+    },
+    {
+      "id": "comp-1784003897479",
+      "name": "Hello",
+      "designation": "TA",
+      "mobile": "9979271578",
+      "email": "saff@gmail.com",
+      "locationRoom": "2",
+      "department": "IT",
+      "complaintDescriptionFull": "Hello NET NOT",
+      "typeOfComplaint": "IT",
+      "photoDocument": "/uploads/complaints/Nihr_Horizontal_Hindi__2_.png",
+      "status": "Pending",
+      "priority": "Medium",
+      "superUserRemark": "fs",
+      "createdAt": "2026-07-14T04:38:17.479Z",
+      "updatedAt": "2026-07-14T05:14:44.675Z",
+      "assignedStaff": "dfdf"
     }
   ]
 }
