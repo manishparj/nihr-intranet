@@ -61,513 +61,434 @@ export const SalaryPortalView: React.FC = () => {
     }
   };
 
-  // Shared table-based HTML used for both download and print, so the two
-  // outputs always stay visually identical and both scale down cleanly.
-const buildSlipHTML = (activeSlip: SalarySlip, forPrint: boolean) => {
+  const handleDownloadSlip = () => {
+    if (!activeSlip) return;
+
+    try {
+      const details = activeSlip.details || {};
+      const getVal = (k: string) => String(details[k] ?? '-');
+      const titleText = `Salary_Slip_${activeSlip.name.replace(/\s+/g, '_')}_${activeSlip.month}_${activeSlip.year}`;
+
+      const basicNum = parseFloat(getVal('Basic Pay').replace(/[^0-9.]/g, '')) || 0;
+      const hraNum = parseFloat(getVal('HRA').replace(/[^0-9.]/g, '')) || 0;
+      const grossNum = parseFloat(getVal('Gross Remuneration').replace(/[^0-9.]/g, '')) || 0;
+      const taxNum = parseFloat(getVal('Income Tax Deduction').replace(/[^0-9.]/g, '')) || 0;
+      const lwpDedNum = parseFloat(getVal('Leave Without Pay Deduction').replace(/[^0-9.]/g, '')) || 0;
+      const totalDed = taxNum + lwpDedNum;
+      const netNum = parseFloat(getVal('Net Pay').replace(/[^0-9.]/g, '')) || 0;
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${titleText}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; background: #f8fafc; color: #1e293b; line-height: 1.5; }
+            .slip-container { max-width: 800px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
+            .header-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; border-bottom: 3px solid #005EB8; padding-bottom: 15px; }
+            .header-title { font-size: 22px; font-weight: 800; color: #005EB8; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+            .header-subtitle { font-size: 11px; font-weight: bold; color: #64748b; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; }
+            
+            .section-title { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #475569; letter-spacing: 1px; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }
+            
+            .meta-grid { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            .meta-grid td { width: 33.33%; padding: 10px; vertical-align: top; border: 1px solid #e2e8f0; background: #fafafa; }
+            .meta-label { font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 3px; }
+            .meta-val { font-size: 12px; font-weight: bold; color: #0f172a; }
+
+            .attendance-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; text-align: center; }
+            .attendance-table th { background: #f1f5f9; padding: 6px; font-size: 9px; font-weight: 800; color: #475569; border: 1px solid #e2e8f0; text-transform: uppercase; }
+            .attendance-table td { padding: 8px; font-size: 11px; font-weight: bold; color: #1e293b; border: 1px solid #e2e8f0; }
+
+            .details-table-wrapper { display: flex; justify-content: space-between; margin-bottom: 25px; gap: 20px; }
+            .details-column { width: 50%; }
+            .details-table { width: 100%; border-collapse: collapse; }
+            .details-table th { background: #005EB8; color: #ffffff; padding: 8px; font-size: 11px; font-weight: bold; text-align: left; text-transform: uppercase; }
+            .details-table td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+            
+            .total-row { background: #f8fafc; font-weight: bold; }
+            .total-row td { border-top: 2px solid #cbd5e1; color: #0f172a; font-weight: 800; }
+
+            .net-pay-banner { background: #005EB8; color: #ffffff; padding: 20px; border-radius: 8px; text-align: center; margin-top: 20px; }
+            .net-pay-label { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+            .net-pay-val { font-size: 26px; font-weight: 900; margin: 5px 0 0 0; }
+
+            .footer-note { font-size: 10px; text-align: center; color: #94a3b8; margin-top: 35px; font-weight: 500; border-t: 1px solid #f1f5f9; padding-top: 15px; }
+          </style>
+        </head>
+        <body>
+          <div class="slip-container">
+            <table class="header-table">
+              <tr>
+                <td style="width: 70px; padding-bottom: 10px;">
+                  <img src="https://icmr.gov.in/images/icmr_logo.png" alt="ICMR Logo" style="height: 50px; width: auto;" />
+                </td>
+                <td style="padding-left: 15px; padding-bottom: 10px;">
+                  <h1 class="header-title">National Institute for Health Research</h1>
+                  <p class="header-subtitle">Official Monthly Payslip & Statement of Earnings</p>
+                </td>
+              </tr>
+            </table>
+
+            <div class="section-title">1. Staff Member & Appointment Details</div>
+            <table class="meta-grid">
+              <tr>
+                <td>
+                  <span class="meta-label">Employee Code</span>
+                  <span class="meta-val">${getVal('Employee Code')}</span>
+                </td>
+                <td>
+                  <span class="meta-label">Employee Name</span>
+                  <span class="meta-val">${getVal('Employee Name')}</span>
+                </td>
+                <td>
+                  <span class="meta-label">Designation</span>
+                  <span class="meta-val">${getVal('Designation')}</span>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="meta-label">Date of Joining</span>
+                  <span class="meta-val">${getVal('Date of Joining')}</span>
+                </td>
+                <td>
+                  <span class="meta-label">Tenure Up To</span>
+                  <span class="meta-val">${getVal('Tenure Up To')}</span>
+                </td>
+                <td>
+                  <span class="meta-label">Aadhaar (Masked)</span>
+                  <span class="meta-val">XXXX-XXXX-${activeSlip.aadhaarNumber.slice(-4)}</span>
+                </td>
+              </tr>
+            </table>
+
+            <div class="section-title">2. Associated Project & Supervisor details</div>
+            <table class="meta-grid">
+              <tr>
+                <td style="width: 50%;">
+                  <span class="meta-label">Project Name</span>
+                  <span class="meta-val" style="font-size: 11px;">${getVal('Project Name')}</span>
+                </td>
+                <td style="width: 50%;">
+                  <span class="meta-label">Principal Investigator</span>
+                  <span class="meta-val">${getVal('Scientist Name')} (${getVal('Scientist Designation')})</span>
+                </td>
+              </tr>
+            </table>
+
+            <div class="section-title">3. Bank Account & Tax Identity</div>
+            <table class="meta-grid">
+              <tr>
+                <td>
+                  <span class="meta-label">Bank Name</span>
+                  <span class="meta-val">${getVal('Bank Name')}</span>
+                </td>
+                <td>
+                  <span class="meta-label">Account Number</span>
+                  <span class="meta-val">${getVal('Account Number')}</span>
+                </td>
+                <td>
+                  <span class="meta-label">IFSC Code</span>
+                  <span class="meta-val">${getVal('IFSC Code')}</span>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <span class="meta-label">PAN Number</span>
+                  <span class="meta-val">${getVal('PAN Number')}</span>
+                </td>
+                <td>
+                  <span class="meta-label">Payslip Month</span>
+                  <span class="meta-val">${activeSlip.month}</span>
+                </td>
+                <td>
+                  <span class="meta-label">Payslip Year</span>
+                  <span class="meta-val">${activeSlip.year}</span>
+                </td>
+              </tr>
+            </table>
+
+            <div class="section-title">4. Attendance & Leaves summary</div>
+            <table class="attendance-table">
+              <thead>
+                <tr>
+                  <th>Month Days</th>
+                  <th>Present Days</th>
+                  <th>Prev Balance</th>
+                  <th>Leave Credit</th>
+                  <th>Total Leave</th>
+                  <th>Leave Availed</th>
+                  <th>Leave Balance</th>
+                  <th>LWP Days</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>${getVal('Days in Month')}</td>
+                  <td>${getVal('Total Present Days')}</td>
+                  <td>${getVal('Balance Leave Brought')}</td>
+                  <td>${getVal('Leave Credit')}</td>
+                  <td>${getVal('Total Leave')}</td>
+                  <td>${getVal('Leave Availed')}</td>
+                  <td>${getVal('Leave Balance')}</td>
+                  <td>${getVal('Leave Without Pay')}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="details-table-wrapper">
+              <div class="details-column">
+                <table class="details-table">
+                  <thead>
+                    <tr>
+                      <th style="border-top-left-radius: 6px; border-bottom-left-radius: 6px;">Earnings Category</th>
+                      <th style="border-top-right-radius: 6px; border-bottom-right-radius: 6px; text-align: right;">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Basic Salary Pay</td>
+                      <td style="text-align: right;">${getVal('Basic Pay')}</td>
+                    </tr>
+                    <tr>
+                      <td>HRA Allowance</td>
+                      <td style="text-align: right;">${getVal('HRA')}</td>
+                    </tr>
+                    <tr class="total-row">
+                      <td>Gross Remuneration</td>
+                      <td style="text-align: right;">${getVal('Gross Remuneration')}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="details-column">
+                <table class="details-table">
+                  <thead>
+                    <tr>
+                      <th style="border-top-left-radius: 6px; border-bottom-left-radius: 6px;">Deductions Category</th>
+                      <th style="border-top-right-radius: 6px; border-bottom-right-radius: 6px; text-align: right;">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Income Tax (TDS)</td>
+                      <td style="text-align: right;">${getVal('Income Tax Deduction')}</td>
+                    </tr>
+                    <tr>
+                      <td>Leave Without Pay Deduction</td>
+                      <td style="text-align: right;">${getVal('Leave Without Pay Deduction')}</td>
+                    </tr>
+                    <tr class="total-row">
+                      <td>Total Deductions</td>
+                      <td style="text-align: right;">₹${totalDed.toLocaleString('en-IN')}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="net-pay-banner">
+              <div class="net-pay-label">Net Salary Disbursed / Take-home pay</div>
+              <div class="net-pay-val">${getVal('Net Pay')}</div>
+            </div>
+
+            <p class="footer-note">This statement has been authenticated dynamically under Central Payroll Registry of National Institute for Health Research. No hand-drawn signature is required.</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${titleText}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      message.success('Detailed salary slip statement downloaded successfully!');
+    } catch (e: any) {
+      console.error(e);
+      message.error('Failed to export salary slip document.');
+    }
+  };
+
+  const handlePrintSlip = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow || !activeSlip) {
+      message.error('Failed to open printing target. Please allow popups.');
+      return;
+    }
+
     const details = activeSlip.details || {};
-    const getVal = (k: string) => details[k] || '-';
+    const getVal = (k: string) => String(details[k] ?? '-');
+    const basicNum = parseFloat(getVal('Basic Pay').replace(/[^0-9.]/g, '')) || 0;
+    const hraNum = parseFloat(getVal('HRA').replace(/[^0-9.]/g, '')) || 0;
+    const grossNum = parseFloat(getVal('Gross Remuneration').replace(/[^0-9.]/g, '')) || 0;
     const taxNum = parseFloat(getVal('Income Tax Deduction').replace(/[^0-9.]/g, '')) || 0;
     const lwpDedNum = parseFloat(getVal('Leave Without Pay Deduction').replace(/[^0-9.]/g, '')) || 0;
     const totalDed = taxNum + lwpDedNum;
 
-    return `
-      <!DOCTYPE html>
+    printWindow.document.write(`
       <html>
       <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>REMUNERATION STATEMENT - ${activeSlip.name} - ${activeSlip.month} ${activeSlip.year}</title>
+        <title>Print Salary Slip - ${activeSlip.name}</title>
         <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { 
-            font-family: 'Segoe UI', Arial, Helvetica, sans-serif; 
-            margin: 0; 
-            padding: 12px; 
-            background: #f0f2f5; 
-            color: #1a2332; 
-            font-size: 11px;
-            line-height: 1.5;
-          }
-          .sheet { 
-            max-width: 850px; 
-            margin: 0 auto; 
-            background: #ffffff; 
-            border: 1px solid #d1d5db; 
-            border-radius: 6px; 
-            overflow: hidden;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-          }
-          
-          /* Header */
-          .header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 20px;
-            border-bottom: 2.5px solid #1a5fb4;
-            background: #f8faff;
-          }
-          .header img { height: 38px; width: auto; }
-          .header .org-name { 
-            font-size: 15px; 
-            font-weight: 800; 
-            color: #1a5fb4; 
-            margin: 0; 
-            letter-spacing: 0.3px;
-          }
-          .header .org-sub { 
-            font-size: 9px; 
-            font-weight: 600; 
-            color: #5e6f8d; 
-            letter-spacing: 0.5px; 
-            text-transform: uppercase;
-          }
-          .title-bar {
-            background: #f0f4f8;
-            padding: 6px;
-            text-align: center;
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            color: #1a2332;
-            border-bottom: 1px solid #e2e8f0;
-          }
-
-          /* Content */
-          .content { padding: 14px 18px 8px; }
-
-          /* Staff & Bank Combined - Two Column Layout */
-          .info-grid {
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 10px;
-          }
-          .info-grid-inner {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0;
-          }
-          .info-col {
-            padding: 8px 14px;
-          }
-          .info-col:first-child {
-            border-right: 1px solid #e2e8f0;
-          }
-          .info-row {
-            display: flex;
-            padding: 4px 0;
-            border-bottom: 1px solid #f1f5f9;
-          }
-          .info-row:last-child {
-            border-bottom: none;
-          }
-          .info-row .label {
-            width: 35%;
-            font-weight: 700;
-            color: #5e6f8d;
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            flex-shrink: 0;
-          }
-          .info-row .value {
-            width: 65%;
-            font-weight: 600;
-            color: #0f172a;
-            font-size: 10.5px;
-            word-break: break-word;
-          }
-          .info-col .col-title {
-            font-size: 9px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #1a5fb4;
-            padding: 4px 0 3px;
-            border-bottom: 2px solid #1a5fb4;
-            margin-bottom: 5px;
-          }
-          .info-col .col-title.gray {
-            color: #475569;
-            border-bottom-color: #475569;
-          }
-
-          /* Leave Table */
-          .leave-wrap {
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 10px;
-          }
-          .leave-wrap .table-title {
-            background: #f0f4f8;
-            padding: 5px 12px;
-            font-size: 9px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #475569;
-            border-bottom: 1px solid #e2e8f0;
-          }
-          .leave-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 10.5px;
-          }
-          .leave-table th {
-            background: #f8fafc;
-            color: #475569;
-            font-weight: 800;
-            font-size: 8.5px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            padding: 6px 8px;
-            border-bottom: 1.5px solid #e2e8f0;
-            text-align: center;
-          }
-          .leave-table td {
-            padding: 7px 8px;
-            text-align: center;
-            font-weight: 700;
-            font-size: 10.5px;
-            border-bottom: 1px solid #f1f5f9;
-          }
-          .leave-table tr:last-child td {
-            border-bottom: none;
-          }
-
-          /* Salary Row - 3 columns */
-          .salary-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 10px;
-          }
-          .salary-box {
-            border: 1px solid #e2e8f0;
-            border-radius: 4px;
-            overflow: hidden;
-          }
-          .salary-box .box-title {
-            padding: 5px 12px;
-            font-size: 9px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #ffffff;
-            text-align: center;
-          }
-          .salary-box .box-title.earn { background: #1a5fb4; }
-          .salary-box .box-title.ded { background: #475569; }
-          .salary-box .box-title.net { background: #0d9488; }
-
-          .salary-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 12px;
-            border-bottom: 1px solid #f1f5f9;
-            font-size: 10.5px;
-          }
-          .salary-item:last-child {
-            border-bottom: none;
-          }
-          .salary-item .s-label {
-            font-weight: 600;
-            color: #334155;
-          }
-          .salary-item .s-value {
-            font-weight: 700;
-            color: #0f172a;
-          }
-          .salary-item.total {
-            background: #f8fafc;
-            font-weight: 800;
-            border-top: 2px solid #d1d5db;
-          }
-          .salary-item.total .s-value.gross {
-            color: #1a5fb4;
-            font-size: 11.5px;
-          }
-          .salary-item.total .s-value.ded {
-            color: #dc2626;
-            font-size: 11.5px;
-          }
-          .salary-item.net-row {
-            background: #0d9488;
-            padding: 8px 12px;
-            border-bottom: none;
-          }
-          .salary-item.net-row .s-label {
-            color: #ffffff;
-            font-size: 10.5px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-          }
-          .salary-item.net-row .s-value {
-            color: #ffffff;
-            font-size: 16px;
-            font-weight: 900;
-          }
-
-          /* Important Box */
-          .important-box {
-            border: 2px solid #dc2626;
-            border-radius: 4px;
-            padding: 10px 14px;
-            background: #fefaf9;
-            margin: 0 0 6px 0;
-          }
-          .important-box .imp-title {
-            font-size: 10px;
-            font-weight: 900;
-            color: #dc2626;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 5px;
-          }
-          .important-box p {
-            font-size: 9px;
-            line-height: 1.6;
-            color: #1e293b;
-            margin: 0 0 4px 0;
-          }
-          .important-box p:last-child {
-            margin-bottom: 0;
-          }
-          .important-box .hl {
-            color: #dc2626;
-            font-weight: 700;
-          }
-
-          /* Footer */
-          .footer {
-            text-align: center;
-            font-size: 8.5px;
-            color: #94a3b8;
-            padding: 8px 18px 12px;
-            border-top: 1px solid #f1f5f9;
-          }
-          .footer .contact {
-            font-size: 9.5px;
-            color: #5e6f8d;
-            font-weight: 600;
-            margin: 3px 0;
-          }
-          .footer .contact a {
-            color: #1a5fb4;
-            text-decoration: none;
-          }
-
-          /* Print Styles */
-          @media print {
-            body { 
-              background: #fff; 
-              padding: 6px; 
-              font-size: 10px;
-            }
-            .sheet { 
-              border: none; 
-              border-radius: 0; 
-              max-width: 100%; 
-              box-shadow: none;
-              margin: 0;
-            }
-            .header { padding: 8px 16px; }
-            .header img { height: 32px; }
-            .header .org-name { font-size: 13px; }
-            .content { padding: 10px 14px 6px; }
-            .info-col { padding: 6px 12px; }
-            .info-col:first-child {
-              border-right: 1px solid #e2e8f0;
-            }
-            .info-row { padding: 3px 0; }
-            .info-row .label { font-size: 8px; }
-            .info-row .value { font-size: 9.5px; }
-            .info-col .col-title { font-size: 8px; padding: 3px 0; }
-            .leave-table th { font-size: 7.5px; padding: 5px 6px; }
-            .leave-table td { font-size: 9.5px; padding: 5px 6px; }
-            .salary-item { font-size: 9.5px; padding: 4px 10px; }
-            .salary-item.total .s-value.gross { font-size: 10.5px; }
-            .salary-item.total .s-value.ded { font-size: 10.5px; }
-            .salary-item.net-row { padding: 6px 10px; }
-            .salary-item.net-row .s-label { font-size: 9.5px; }
-            .salary-item.net-row .s-value { font-size: 14px; }
-            .salary-box .box-title { font-size: 8px; padding: 4px 10px; }
-            .important-box { padding: 8px 12px; }
-            .important-box .imp-title { font-size: 9px; }
-            .important-box p { font-size: 8px; line-height: 1.5; margin-bottom: 3px; }
-            .footer { font-size: 7.5px; padding: 6px 14px 8px; }
-            .footer .contact { font-size: 8.5px; }
-            .title-bar { font-size: 10px; padding: 5px; }
-            .salary-row { gap: 8px; }
-            .info-grid { margin-bottom: 8px; }
-            .leave-wrap { margin-bottom: 8px; }
-            .salary-row { margin-bottom: 8px; }
-            
-            /* Ensure colors print */
-            .salary-box .box-title.earn { background: #1a5fb4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .salary-box .box-title.ded { background: #475569 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .salary-box .box-title.net { background: #0d9488 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .salary-item.net-row { background: #0d9488 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          }
-
-          /* Responsive */
-          @media (max-width: 640px) {
-            body { padding: 6px; font-size: 10px; }
-            .header { padding: 8px 12px; flex-wrap: wrap; }
-            .header img { height: 28px; }
-            .header .org-name { font-size: 12px; }
-            .content { padding: 8px 10px 4px; }
-            .info-grid-inner {
-              grid-template-columns: 1fr;
-            }
-            .info-col:first-child {
-              border-right: none;
-              border-bottom: 1px solid #e2e8f0;
-            }
-            .salary-row { grid-template-columns: 1fr; gap: 6px; }
-            .info-row .label { width: 40%; }
-            .info-row .value { width: 60%; }
-            .salary-item.net-row .s-value { font-size: 14px; }
-            .important-box p { font-size: 8.5px; }
-          }
+          body { font-family: sans-serif; padding: 20px; color: #1a202c; }
+          .container { border: 1px solid #cbd5e1; padding: 30px; border-radius: 8px; max-width: 750px; margin: 0 auto; }
+          .header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid #005EB8; padding-bottom: 15px; }
+          .meta-section { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; }
+          .meta-item { flex: 1; min-width: 200px; margin-bottom: 8px; }
+          .label { font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block; }
+          .val { font-size: 12px; font-weight: bold; color: #1e293b; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+          th { background: #f1f5f9; color: #475569; padding: 8px; font-size: 10px; border: 1px solid #cbd5e1; text-transform: uppercase; }
+          td { padding: 10px 8px; border: 1px solid #cbd5e1; font-size: 12px; }
+          .flex-row { display: flex; justify-content: space-between; gap: 20px; margin-top: 20px; }
+          .col { width: 50%; }
+          .total { background: #f8fafc; font-weight: bold; }
+          .net-banner { background: #005EB8; color: white; padding: 15px; border-radius: 6px; text-align: center; margin-top: 25px; font-size: 18px; font-weight: bold; }
         </style>
       </head>
       <body>
-        <div class="sheet">
-          <!-- Header -->
+        <div class="container">
           <div class="header">
-            <img src="https://niirncd.icmr.org.in/assets/img/logo/nihrlogo.png" alt="ICMR Logo" />
+            <img src="https://icmr.gov.in/images/icmr_logo.png" alt="Logo" style="height: 45px;" />
             <div>
-              <div class="org-name">ICMR-National Institute for Health Research, Jodhpur</div>
-              <div class="org-sub">Ministry of Health & Family Welfare, Government of India</div>
+              <h2 style="margin: 0; color: #005EB8; font-size: 18px;">National Institute for Health Research</h2>
+              <p style="margin: 3px 0 0 0; font-size: 11px; color: #777;">OFFICIAL SALARY SLIP STATEMENT</p>
             </div>
           </div>
-          <div class="title-bar">Remuneration Statement &mdash; ${activeSlip.month} ${activeSlip.year}</div>
+          
+          <h4 style="margin: 15px 0 5px 0; font-size: 11px; text-transform: uppercase; color: #475569;">1. Staff Appointment Details</h4>
+          <div class="meta-section">
+            <div class="meta-item"><span class="label">Employee Name</span><span class="val">${getVal('Employee Name')}</span></div>
+            <div class="meta-item"><span class="label">Employee Code</span><span class="val">${getVal('Employee Code')}</span></div>
+            <div class="meta-item"><span class="label">Designation</span><span class="val">${getVal('Designation')}</span></div>
+            <div class="meta-item"><span class="label">Date of Joining</span><span class="val">${getVal('Date of Joining')}</span></div>
+            <div class="meta-item"><span class="label">Tenure Up To</span><span class="val">${getVal('Tenure Up To')}</span></div>
+            <div class="meta-item"><span class="label">Aadhaar (Masked)</span><span class="val">XXXX-XXXX-${activeSlip.aadhaarNumber.slice(-4)}</span></div>
+          </div>
 
-          <div class="content">
-            <!-- Staff & Bank Details - Two Column Layout -->
-            <div class="info-grid">
-              <div class="info-grid-inner">
-                <!-- Left Column: Staff Details -->
-                <div class="info-col">
-                  <div class="col-title">Staff Details</div>
-                  <div class="info-row"><span class="label">Employee Name</span><span class="value">${getVal('Employee Name')}</span></div>
-                  <div class="info-row"><span class="label">Employee Code</span><span class="value">${getVal('Employee Code')}</span></div>
-                  <div class="info-row"><span class="label">Designation</span><span class="value">${getVal('Designation')}</span></div>
-                  <div class="info-row"><span class="label">Date of Joining</span><span class="value">${getVal('Date of Joining')}</span></div>
-                  <div class="info-row"><span class="label">Tenure Up To</span><span class="value">${getVal('Tenure Up To')}</span></div>
-                  <div class="info-row"><span class="label">Employment Status</span><span class="value">Purely Temporary / Project Staff (Co-terminus with the Project)</span></div>
-                  <div class="info-row"><span class="label">Aadhaar (Masked)</span><span class="value">XXXX-XXXX-${activeSlip.aadhaarNumber.slice(-4)}</span></div>
-                  <div class="info-row"><span class="label">Project Name</span><span class="value">${getVal('Project Name')}</span></div>
-                  <div class="info-row"><span class="label">Principal Investigator</span><span class="value">${getVal('Scientist Name')}</span></div>
-                  <div class="info-row"><span class="label">PI Designation</span><span class="value">${getVal('Scientist Designation')}</span></div>
-                </div>
-                
-                <!-- Right Column: Bank Details -->
-                <div class="info-col">
-                  <div class="col-title gray">Bank Details</div>
-                  <div class="info-row"><span class="label">Bank Name</span><span class="value">${getVal('Bank Name')}</span></div>
-                  <div class="info-row"><span class="label">Account Number</span><span class="value">${getVal('Account Number')}</span></div>
-                  <div class="info-row"><span class="label">IFSC Code</span><span class="value">${getVal('IFSC Code')}</span></div>
-                  <div class="info-row"><span class="label">PAN Number</span><span class="value">${getVal('PAN Number')}</span></div>
-                </div>
-              </div>
-            </div>
+          <h4 style="margin: 15px 0 5px 0; font-size: 11px; text-transform: uppercase; color: #475569;">2. Project Reference & Supervisor</h4>
+          <div class="meta-section">
+            <div style="flex: 2;"><span class="label">Project Name</span><span class="val" style="font-size: 11px;">${getVal('Project Name')}</span></div>
+            <div style="flex: 1;"><span class="label">PI / Supervisor Name</span><span class="val">${getVal('Scientist Name')} (${getVal('Scientist Designation')})</span></div>
+          </div>
 
-            <!-- Leave Details -->
-            <div class="leave-wrap">
-              <div class="table-title">Leave Details</div>
-              <table class="leave-table">
+          <h4 style="margin: 15px 0 5px 0; font-size: 11px; text-transform: uppercase; color: #475569;">3. Bank Accounts & Attendance Period</h4>
+          <div class="meta-section">
+            <div class="meta-item"><span class="label">Bank Name</span><span class="val">${getVal('Bank Name')}</span></div>
+            <div class="meta-item"><span class="label">Account Number</span><span class="val">${getVal('Account Number')}</span></div>
+            <div class="meta-item"><span class="label">IFSC Code</span><span class="val">${getVal('IFSC Code')}</span></div>
+            <div class="meta-item"><span class="label">PAN Number</span><span class="val">${getVal('PAN Number')}</span></div>
+            <div class="meta-item"><span class="label">Pay period</span><span class="val">${activeSlip.month} ${activeSlip.year}</span></div>
+          </div>
+
+          <h4 style="margin: 15px 0 5px 0; font-size: 11px; text-transform: uppercase; color: #475569;">4. Leaves & Attendance Summary</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Days in Month</th>
+                <th>Present Days</th>
+                <th>Brought Forward</th>
+                <th>Leave Credit</th>
+                <th>Total Leave</th>
+                <th>Leave Availed</th>
+                <th>Leave Balance</th>
+                <th>LWP Days</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="text-align: center;">
+                <td>${getVal('Days in Month')}</td>
+                <td>${getVal('Total Present Days')}</td>
+                <td>${getVal('Balance Leave Brought')}</td>
+                <td>${getVal('Leave Credit')}</td>
+                <td>${getVal('Total Leave')}</td>
+                <td>${getVal('Leave Availed')}</td>
+                <td>${getVal('Leave Balance')}</td>
+                <td>${getVal('Leave Without Pay')}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="flex-row">
+            <div class="col">
+              <h4 style="margin: 0 0 5px 0; font-size: 11px; text-transform: uppercase; color: #475569;">Earnings</h4>
+              <table>
                 <thead>
                   <tr>
-                    <th>Month Days</th>
-                    <th>Present</th>
-                    <th>B/F Leave</th>
-                    <th>Leave Credit</th>
-                    <th>Total Leave</th>
-                    <th>Availed</th>
-                    <th>Balance</th>
-                    <th>LWP Days</th>
+                    <th style="text-align: left;">Earnings Category</th>
+                    <th style="text-align: right;">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>${getVal('Days in Month')}</td>
-                    <td>${getVal('Total Present Days')}</td>
-                    <td>${getVal('Balance Leave Brought')}</td>
-                    <td>${getVal('Leave Credit')}</td>
-                    <td>${getVal('Total Leave')}</td>
-                    <td>${getVal('Leave Availed')}</td>
-                    <td>${getVal('Leave Balance')}</td>
-                    <td>${getVal('Leave Without Pay')}</td>
+                    <td>Basic Pay</td>
+                    <td style="text-align: right;">${getVal('Basic Pay')}</td>
+                  </tr>
+                  <tr>
+                    <td>HRA Allowance</td>
+                    <td style="text-align: right;">${getVal('HRA')}</td>
+                  </tr>
+                  <tr class="total">
+                    <td>Gross Remuneration</td>
+                    <td style="text-align: right;">${getVal('Gross Remuneration')}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            <!-- Earnings, Deductions & Net Pay -->
-            <div class="salary-row">
-              <div class="salary-box">
-                <div class="box-title earn">Earnings</div>
-                <div class="salary-item"><span class="s-label">Consolidated Remuneration</span><span class="s-value">${getVal('Basic Pay')}</span></div>
-                <div class="salary-item"><span class="s-label">HRA Allowance</span><span class="s-value">${getVal('HRA')}</span></div>
-                <div class="salary-item total"><span class="s-label">Gross Remuneration</span><span class="s-value gross">${getVal('Gross Remuneration')}</span></div>
-              </div>
-
-              <div class="salary-box">
-                <div class="box-title ded">Deductions</div>
-                <div class="salary-item"><span class="s-label">Income Tax (TDS)</span><span class="s-value">${getVal('Income Tax Deduction')}</span></div>
-                <div class="salary-item"><span class="s-label">Leave Without Pay</span><span class="s-value">${getVal('Leave Without Pay Deduction')}</span></div>
-                <div class="salary-item total"><span class="s-label">Total Deductions</span><span class="s-value ded">₹${totalDed.toLocaleString('en-IN')}</span></div>
-              </div>
-
-              <div class="salary-box">
-                <div class="box-title net">Net Pay</div>
-                <div class="salary-item net-row">
-                  <span class="s-label">Take-home Amount</span>
-                  <span class="s-value">${getVal('Net Pay')}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Important Instructions -->
-            <div class="important-box">
-              <div class="imp-title">⚠️ Important Instructions &amp; Disclaimers</div>
-              <p><strong>1. Employment Status:</strong> This is a <span class="hl">purely temporary/contractual</span> engagement under a time-bound research project. The employee has <span class="hl">no claim</span> for regular appointment, absorption, continuation of service, pension, or any other benefits beyond the terms of the appointment.</p>
-              <p><strong>2. Document Purpose:</strong> This computer-generated remuneration statement is issued <span class="hl">only for information and record purposes</span>. It does not require a physical signature.</p>
-              <p><strong>3. Non-Transferability:</strong> This statement shall <span class="hl">not be construed</span> as proof of permanent Government employment or guarantee of future employment.</p>
-            </div>
-
-            <!-- Footer -->
-            <div class="footer">
-              <div class="contact">ICMR&ndash;National Institute for Health Research, Jodhpur</div>
-              <div class="contact">Website: <a href="https://niirncd.icmr.org.in/">https://niirncd.icmr.org.in/</a> &nbsp;|&nbsp; Email: <a href="mailto:director-niirncd@icmr.gov.in">director-niirncd@icmr.gov.in</a></div>
-              <div style="margin-top: 3px;">System-generated document &bull; Valid without signature</div>
+            <div class="col">
+              <h4 style="margin: 0 0 5px 0; font-size: 11px; text-transform: uppercase; color: #475569;">Deductions</h4>
+              <table>
+                <thead>
+                  <tr>
+                    <th style="text-align: left;">Deductions Category</th>
+                    <th style="text-align: right;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Income Tax (TDS)</td>
+                    <td style="text-align: right;">${getVal('Income Tax Deduction')}</td>
+                  </tr>
+                  <tr>
+                    <td>Leave Without Pay Deduction</td>
+                    <td style="text-align: right;">${getVal('Leave Without Pay Deduction')}</td>
+                  </tr>
+                  <tr class="total">
+                    <td>Total Deductions</td>
+                    <td style="text-align: right;">₹${totalDed.toLocaleString('en-IN')}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
+
+          <div class="net-banner">
+            NET TAKE-HOME REMUNERATION: &nbsp; ${getVal('Net Pay')}
+          </div>
+          
+          <p style="text-align: center; font-size: 9px; color: #94a3b8; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 10px;">This is a dynamically generated statement. No hand-drawn signature is required.</p>
         </div>
-        ${forPrint ? '<script>window.onload = function(){ window.print(); };</script>' : ''}
+        <script>
+          window.onload = function() {
+            window.print();
+          }
+        </script>
       </body>
       </html>
-    `;
-  };
-
-  const handlePrintSlip = () => {
-    if (!activeSlip) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      message.error('Failed to open printing target. Please allow popups.');
-      return;
-    }
-    printWindow.document.write(buildSlipHTML(activeSlip, true));
+    `);
     printWindow.document.close();
   };
 
   const details = activeSlip?.details || {};
-  const getVal = (k: string) => details[k] || '-';
+  const getVal = (k: string) => String(details[k] ?? '-');
   const taxNum = parseFloat(getVal('Income Tax Deduction').replace(/[^0-9.]/g, '')) || 0;
   const lwpDedNum = parseFloat(getVal('Leave Without Pay Deduction').replace(/[^0-9.]/g, '')) || 0;
   const totalDed = taxNum + lwpDedNum;
@@ -651,15 +572,202 @@ const buildSlipHTML = (activeSlip: SalarySlip, forPrint: boolean) => {
       ) : (
         <div className="space-y-6">
           <div className="flex justify-between items-center bg-slate-100 dark:bg-zinc-800/50 p-3 rounded-lg">
-            <span className="text-xs font-bold text-slate-600 dark:text-zinc-300">
+            <span className="text-xs font-bold text-slate-600 dark:text-zinc-300 animate-pulse">
               ✔️ Authenticated successfully as <strong className="text-blue-600 dark:text-blue-400">{activeSlip.name}</strong>
             </span>
             <Button size="small" type="dashed" danger onClick={() => setActiveSlip(null)}>
               Sign Out / Lock Portal
             </Button>
           </div>
+
+          <Card 
+            id="printable-salary-slip"
+            variant="outlined"
+            className="shadow-md rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-2 md:p-6"
+          >
+            {/* Header section with branding & logo */}
+            <div className="flex items-center gap-4 border-b border-slate-200 dark:border-zinc-800 pb-4 mb-4">
+              <div className="w-12 h-12 bg-[#005EB8] rounded flex items-center justify-center p-1 overflow-hidden">
+                <img src="https://icmr.gov.in/images/icmr_logo.png" alt="ICMR Logo" className="w-full h-full object-contain" />
+              </div>
+              <div>
+                <h2 className="text-sm md:text-base font-black text-slate-800 dark:text-zinc-100 uppercase tracking-wide leading-tight">
+                  National Institute for Health Research
+                </h2>
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 uppercase tracking-widest font-extrabold block">
+                  Official Statement of Monthly Payroll & Statement of Earnings
+                </span>
+              </div>
+            </div>
+
+            {/* Profile grids info */}
+            <h4 className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">1. Appointment & Staff Profile</h4>
+            <Row gutter={[16, 16]} className="bg-slate-50 dark:bg-zinc-800/20 p-4 rounded-xl border border-slate-100 dark:border-zinc-800/50 mb-4">
+              <Col xs={24} sm={8}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Staff Member Name</div>
+                <div className="text-xs font-black text-slate-800 dark:text-zinc-200">{getVal('Employee Name')}</div>
+              </Col>
+              <Col xs={12} sm={8}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Appointed Temp Code</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">{getVal('Employee Code')}</div>
+              </Col>
+              <Col xs={12} sm={8}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Designation</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">{getVal('Designation')}</div>
+              </Col>
+              <Col xs={12} sm={8}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Date of Joining</div>
+                <div className="text-xs font-medium text-slate-800 dark:text-zinc-200">{getVal('Date of Joining')}</div>
+              </Col>
+              <Col xs={12} sm={8}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Tenure Up To</div>
+                <div className="text-xs font-medium text-slate-800 dark:text-zinc-200">{getVal('Tenure Up To')}</div>
+              </Col>
+              <Col xs={12} sm={8}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Aadhaar (Masked)</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">XXXX-XXXX-{activeSlip.aadhaarNumber.slice(-4)}</div>
+              </Col>
+            </Row>
+
+            <h4 className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">2. Associated Project & PI Scientist</h4>
+            <Row gutter={[16, 16]} className="bg-slate-50 dark:bg-zinc-800/20 p-4 rounded-xl border border-slate-100 dark:border-zinc-800/50 mb-4">
+              <Col xs={24} sm={16}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Project Title</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-zinc-200 leading-snug">{getVal('Project Name')}</div>
+              </Col>
+              <Col xs={24} sm={8}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Principal Investigator</div>
+                <div className="text-xs font-black text-slate-800 dark:text-zinc-200">{getVal('Scientist Name')}</div>
+                <span className="text-[9px] text-slate-400 italic block">{getVal('Scientist Designation')}</span>
+              </Col>
+            </Row>
+
+            <h4 className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">3. Bank Account & Payslip Metadata</h4>
+            <Row gutter={[16, 16]} className="bg-slate-50 dark:bg-zinc-800/20 p-4 rounded-xl border border-slate-100 dark:border-zinc-800/50 mb-4">
+              <Col xs={12} sm={6}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Bank Name</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">{getVal('Bank Name')}</div>
+              </Col>
+              <Col xs={12} sm={6}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Account Number</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">{getVal('Account Number')}</div>
+              </Col>
+              <Col xs={12} sm={6}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">IFSC Code</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">{getVal('IFSC Code')}</div>
+              </Col>
+              <Col xs={12} sm={6}>
+                <div className="text-[9px] text-slate-400 font-bold uppercase">PAN Number</div>
+                <div className="text-xs font-bold text-slate-800 dark:text-zinc-200">{getVal('PAN Number')}</div>
+              </Col>
+            </Row>
+
+            <h4 className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">4. Leaves & Attendance Summary</h4>
+            <div className="border border-slate-100 dark:border-zinc-800 rounded-xl overflow-hidden mb-6 bg-slate-50/30 dark:bg-zinc-800/10">
+              <table className="w-full text-center text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100/70 dark:bg-zinc-800/50 text-slate-500 uppercase font-black text-[9px] border-b border-slate-100 dark:border-zinc-800">
+                    <th className="p-2">Month Days</th>
+                    <th className="p-2">Present</th>
+                    <th className="p-2">B/F Leave</th>
+                    <th className="p-2">Leave Credit</th>
+                    <th className="p-2">Total Leave</th>
+                    <th className="p-2">Leave Availed</th>
+                    <th className="p-2">Balance</th>
+                    <th className="p-2 text-red-500">LWP Days</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-x divide-slate-100 dark:divide-zinc-800 font-bold text-slate-700 dark:text-zinc-300">
+                  <tr>
+                    <td className="p-3">{getVal('Days in Month')}</td>
+                    <td className="p-3 text-emerald-600 dark:text-emerald-400">{getVal('Total Present Days')}</td>
+                    <td className="p-3">{getVal('Balance Leave Brought')}</td>
+                    <td className="p-3">{getVal('Leave Credit')}</td>
+                    <td className="p-3">{getVal('Total Leave')}</td>
+                    <td className="p-3 text-amber-600">{getVal('Leave Availed')}</td>
+                    <td className="p-3 text-blue-600 dark:text-blue-400">{getVal('Leave Balance')}</td>
+                    <td className="p-3 text-red-600">{getVal('Leave Without Pay')}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <Row gutter={[16, 16]} className="mb-6">
+              <Col xs={24} md={12}>
+                <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-[#005EB8] text-white uppercase text-[10px] font-black">
+                        <th className="p-3 text-left">Earnings Category</th>
+                        <th className="p-3 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+                      <tr>
+                        <td className="p-3 font-semibold text-slate-700 dark:text-zinc-300">Basic Pay</td>
+                        <td className="p-3 text-right font-black text-slate-800 dark:text-zinc-200">{getVal('Basic Pay')}</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-semibold text-slate-700 dark:text-zinc-300">HRA Allowance</td>
+                        <td className="p-3 text-right font-black text-slate-800 dark:text-zinc-200">{getVal('HRA')}</td>
+                      </tr>
+                      <tr className="bg-slate-50 dark:bg-zinc-800/50 border-t-2 border-slate-200 dark:border-zinc-700">
+                        <td className="p-3 font-bold text-slate-900 dark:text-zinc-100">Gross Remuneration</td>
+                        <td className="p-3 text-right font-black text-[#005EB8] dark:text-blue-400 text-sm">{getVal('Gross Remuneration')}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Col>
+
+              <Col xs={24} md={12}>
+                <div className="border border-slate-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-700 dark:bg-zinc-800 text-white uppercase text-[10px] font-black">
+                        <th className="p-3 text-left">Deductions Category</th>
+                        <th className="p-3 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
+                      <tr>
+                        <td className="p-3 font-semibold text-slate-700 dark:text-zinc-300">Income Tax (TDS)</td>
+                        <td className="p-3 text-right font-black text-slate-800 dark:text-zinc-200">{getVal('Income Tax Deduction')}</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 font-semibold text-slate-700 dark:text-zinc-300">Leave Without Pay Deduction</td>
+                        <td className="p-3 text-right font-black text-slate-800 dark:text-zinc-200">{getVal('Leave Without Pay Deduction')}</td>
+                      </tr>
+                      <tr className="bg-slate-50 dark:bg-zinc-800/50 border-t-2 border-slate-200 dark:border-zinc-700">
+                        <td className="p-3 font-bold text-slate-900 dark:text-zinc-100">Total Deductions</td>
+                        <td className="p-3 text-right font-black text-red-600 dark:text-red-400 text-sm">₹{totalDed.toLocaleString('en-IN')}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Col>
+            </Row>
+
+            <div className="bg-[#005EB8] text-white p-5 rounded-xl text-center shadow-inner mb-4">
+              <span className="text-[10px] uppercase font-black tracking-widest block opacity-85">Net Disbursed Take-home Salary</span>
+              <span className="text-2xl md:text-3xl font-black block mt-1 tracking-tight">{getVal('Net Pay')}</span>
+            </div>
+
+            <div className="text-center text-[10px] text-slate-400 leading-normal border-t border-slate-100 dark:border-zinc-800 pt-4">
+              * This slip has been generated dynamically based on official project payroll records. No physical signatures are requested.
+            </div>
+          </Card>
+
           {/* Download & Print Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex gap-4 justify-center">
+            <Button 
+              type="primary" 
+              onClick={handleDownloadSlip}
+              icon={<DownloadOutlined />}
+              className="rounded-lg text-xs font-bold h-10 px-6 bg-[#005EB8]"
+            >
+              Download PDF / Payslip Statement
+            </Button>
             <Button 
               onClick={handlePrintSlip}
               icon={<PrinterOutlined />}
@@ -1086,7 +1194,7 @@ export const AdminSalariesManager: React.FC<AdminSalariesManagerProps> = ({ proj
         onCancel={() => setManualModalOpen(false)}
         footer={null}
         width={680}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={manualForm}

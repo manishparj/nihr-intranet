@@ -29,6 +29,7 @@ import { SalaryPortalView, AdminSalariesManager } from './components/SalaryPorta
 import { AppHeader } from './components/layout/AppHeader';
 import { HomeDashboard } from './components/HomeDashboard';
 import { PublicScientistsView } from './components/PublicScientistsView';
+import { PublicProjectsView } from './components/PublicProjectsView';
 import { PublicProjectStaffView } from './components/PublicProjectStaffView';
 import { PublicPermanentStaffView } from './components/PublicPermanentStaffView';
 import { PublicYPConsultantsView } from './components/PublicYPConsultantsView';
@@ -375,12 +376,14 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     const headers = [
       "ID", "Project Title/Name", "Short Name", "Funding Type", "Status",
       "Start Date", "End Date", "Total Budget Allocated", "Principal Investigator (Scientist ID)",
-      "Provisional UCs count"
+      "Provisional UCs count", "Final Report Title", "Final Report File Name"
     ];
     const rows = projects.map(p => [
       p.id, p.name, p.shortName, p.type, p.status,
       p.startDate, p.endDate, p.budget, p.piId,
-      (p.provisionalUCs || []).length
+      (p.provisionalUCs || []).length,
+      p.finalReport?.title || 'N/A',
+      p.finalReport?.fileName || 'N/A'
     ]);
     downloadCSV(headers, rows, "All_Project_Details.csv");
   };
@@ -918,6 +921,22 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         </Space>
       )
     },
+    {
+      title: 'Final Report',
+      key: 'finalReport',
+      render: (_: any, p: Project) => p.finalReport ? (
+        <Button 
+          type="link" 
+          size="small" 
+          className="p-0 h-auto text-xs flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold" 
+          onClick={() => handleDownloadBase64File(p.finalReport?.fileName || 'report.pdf', p.finalReport?.fileData || '')}
+        >
+          <FilePdfOutlined /> {p.finalReport.title || 'View Report'}
+        </Button>
+      ) : (
+        <span className="text-[11px] text-slate-400 dark:text-zinc-500 italic">Not Uploaded</span>
+      )
+    },
     ...(isAuthenticated ? [{
       title: 'Actions',
       key: 'actions',
@@ -1122,6 +1141,18 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       );
     }
 
+    if (currentKey === 'public-projects') {
+      return (
+        <PublicProjectsView
+          projects={projects}
+          scientists={scientists}
+          visibility={visibility}
+          isAuthenticated={isAuthenticated}
+          handleDownloadBase64File={handleDownloadBase64File}
+        />
+      );
+    }
+
     if (currentKey === 'public-pstaff') {
       return (
         <PublicProjectStaffView
@@ -1192,21 +1223,37 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <Col xs={24} lg={8}>
               <Space orientation="vertical" className="w-full animate-fadeIn" size="middle">
                 <Card 
-                  title={<span className="font-extrabold text-xs sm:text-sm text-[#005EB8] dark:text-blue-400">⚙️ QUICK ADMIN PANEL</span>} 
+                  title={<span className="font-extrabold text-xs sm:text-sm text-slate-800 dark:text-zinc-100 flex items-center gap-1.5">⚙️ INSTITUTIONAL OPERATIONS CONTROL</span>} 
                   variant="borderless" 
-                  className="shadow-sm rounded-xl"
+                  className="shadow-sm rounded-xl border border-slate-100 dark:border-zinc-800"
                 >
-                  <div className="space-y-3">
-                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('scientist'); }}>Register New Scientist</Button>
-                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('project'); }}>Initialize New Project</Button>
-                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}>Add Project Staff</Button>
-                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('perm'); }}>Add Permanent Staff</Button>
-                    <Button type="primary" block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}>Add YP/Consultant</Button>
-                    <Divider className="my-2" />
-                    <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('circular'); }}>Upload Office Circular</Button>
-                    <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('form'); }}>Upload Form Template</Button>
-                    <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('announcement'); }}>Add Announcement Bulletin</Button>
-                    <Button block icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setActiveModal('event'); }}>Schedule New Event</Button>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider mb-2">
+                        1. Registration & Ledger Additions
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-blue-600 hover:bg-blue-500 border-0" onClick={() => { setEditRecord(null); setActiveModal('scientist'); }}>New Scientist</Button>
+                        <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-500 border-0" onClick={() => { setEditRecord(null); setActiveModal('project'); }}>New Project</Button>
+                        <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-purple-600 hover:bg-purple-500 border-0" onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}>Project Staff</Button>
+                        <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-sky-600 hover:bg-sky-500 border-0" onClick={() => { setEditRecord(null); setActiveModal('perm'); }}>Permanent Staff</Button>
+                        <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-500 border-0 col-span-2" onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}>YP & Consultant Staff</Button>
+                      </div>
+                    </div>
+
+                    <Divider className="my-1.5" />
+
+                    <div>
+                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider mb-2">
+                        2. Broadcasts & Library Uploads
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold border-slate-200 dark:border-zinc-800" onClick={() => { setEditRecord(null); setActiveModal('circular'); }}>Circular Doc</Button>
+                        <Button size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold border-slate-200 dark:border-zinc-800" onClick={() => { setEditRecord(null); setActiveModal('form'); }}>Form Template</Button>
+                        <Button size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold border-slate-200 dark:border-zinc-800" onClick={() => { setEditRecord(null); setActiveModal('announcement'); }}>Ticker News</Button>
+                        <Button size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold border-slate-200 dark:border-zinc-800" onClick={() => { setEditRecord(null); setActiveModal('event'); }}>Calendar Event</Button>
+                      </div>
+                    </div>
                   </div>
                 </Card>
 

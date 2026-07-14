@@ -94,7 +94,7 @@ export function PublicProjectStaffView({
         onCancel={() => setRegisterModalVisible(false)}
         footer={null}
         width={800}
-        destroyOnClose
+        destroyOnHidden
         className="rounded-xl overflow-hidden"
       >
         <div className="py-2 max-h-[75vh] overflow-y-auto px-1">

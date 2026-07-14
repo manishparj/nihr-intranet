@@ -45,6 +45,7 @@ export interface Project {
   piId: string; // Scientist ID
   provisionalUCs: { id: string; period: string; fileName: string; fileData: string }[];
   finalUC?: { period: string; fileName: string; fileData: string } | null;
+  finalReport?: { title: string; fileName: string; fileData: string } | null;
   // Enriched
   durationDays?: number;
   pendingDays?: number;

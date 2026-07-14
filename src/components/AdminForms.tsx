@@ -241,13 +241,13 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
   const defaultValues = {
     name: '', shortName: '', type: 'ICMR', status: 'Yet to Start',
     startDate: '', endDate: '', budget: 0, piId: '',
-    provisionalUCs: [], finalUC: null,
+    provisionalUCs: [], finalUC: null, finalReport: null,
     ...initialValues,
   };
 
-  const handleUCUpload = (file: File, callback: (fileName: string, fileData: string) => void) => {
+  const handleFileUpload = (file: File, typeLabel: string, callback: (fileName: string, fileData: string) => void) => {
     if (file.type !== 'application/pdf') {
-      message.error('Only PDF documents are supported for Utilization Certificates.');
+      message.error(`Only PDF documents are supported for ${typeLabel}.`);
       return false;
     }
     const reader = new FileReader();
@@ -347,7 +347,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                handleUCUpload(file, (fileName, fileData) => {
+                                handleFileUpload(file, 'Provisional UC', (fileName, fileData) => {
                                   setFieldValue(`provisionalUCs.${index}.fileName`, fileName);
                                   setFieldValue(`provisionalUCs.${index}.fileData`, fileData);
                                 });
@@ -392,7 +392,7 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        handleUCUpload(file, (fileName, fileData) => {
+                        handleFileUpload(file, 'Final UC', (fileName, fileData) => {
                           setFieldValue('finalUC', {
                             period: values.finalUC?.period || '',
                             fileName,
@@ -404,6 +404,44 @@ export const ProjectForm: React.FC<ProjectFormProps> = ({
                     className="text-xs"
                   />
                   {values.finalUC?.fileName && <span className="text-[10px] text-emerald-600 font-bold truncate block max-w-[120px]">✔️ {values.finalUC.fileName}</span>}
+                </div>
+              </Col>
+            </Row>
+          </Card>
+
+          {/* Final Project Report */}
+          <Card size="small" title={<span className="text-xs font-bold">3. Final Project Report</span>}>
+            <Row gutter={12} className="items-end">
+              <Col xs={24} sm={12}>
+                <label className="text-[10px] text-slate-500 block">Report Title</label>
+                <Input 
+                  placeholder="e.g. Phase III Clinical Evaluation Report" 
+                  value={values.finalReport?.title || ''} 
+                  onChange={(e) => setFieldValue('finalReport', { ...values.finalReport, title: e.target.value })}
+                  size="small"
+                />
+              </Col>
+              <Col xs={24} sm={12}>
+                <label className="text-[10px] text-slate-500 block">Upload Report PDF Document</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="file" 
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleFileUpload(file, 'Final Project Report', (fileName, fileData) => {
+                          setFieldValue('finalReport', {
+                            title: values.finalReport?.title || '',
+                            fileName,
+                            fileData,
+                          });
+                        });
+                      }
+                    }}
+                    className="text-xs"
+                  />
+                  {values.finalReport?.fileName && <span className="text-[10px] text-emerald-600 font-bold truncate block max-w-[120px]">✔️ {values.finalReport.fileName}</span>}
                 </div>
               </Col>
             </Row>

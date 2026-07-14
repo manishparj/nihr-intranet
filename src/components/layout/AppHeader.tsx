@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Layout, Menu, Button, Space, Tag, Drawer, Avatar } from 'antd';
+import { Layout, Menu, Button, Space, Tag, Drawer } from 'antd';
 import { 
   UserOutlined, TeamOutlined, StarOutlined, PrinterOutlined, 
   CustomerServiceOutlined, HomeOutlined, MenuOutlined, LoginOutlined, 
@@ -43,6 +43,7 @@ export function AppHeader({
     return [
       { key: 'public-dashboard', icon: <HomeOutlined />, label: 'Notice Board' },
       ...(visibility?.modules.scientists ? [{ key: 'public-scientists', icon: <UserOutlined />, label: 'Scientists' }] : []),
+      ...(visibility?.modules.projects ? [{ key: 'public-projects', icon: <ProjectOutlined />, label: 'Projects Ledger' }] : []),
       ...(visibility?.modules.projectStaff ? [{ key: 'public-pstaff', icon: <SolutionOutlined />, label: 'Project Staff' }] : []),
       ...(visibility?.modules.permanentStaff ? [{ key: 'public-permanent', icon: <TeamOutlined />, label: 'Permanent Staff' }] : []),
       ...(visibility?.modules.ypConsultants ? [{ key: 'public-ypc', icon: <StarOutlined />, label: 'YP & Consultants' }] : []),
@@ -92,92 +93,99 @@ export function AppHeader({
   };
 
   return (
-    <Header className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-zinc-800/80 px-4 md:px-8 flex justify-between items-center sticky top-0 z-50 h-16 shadow-sm">
-      {/* Brand Logo & Name */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-[#005EB8] rounded-xl flex items-center justify-center overflow-hidden font-bold text-white text-xs shadow-sm flex-shrink-0 border border-blue-400/20">
-          <img 
-            src="https://icmr.gov.in/images/icmr_logo.png" 
-            alt="Logo" 
-            className="w-full h-full object-contain p-1" 
-            onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} 
-          />
-          <span className="italic font-sans">NIHR</span>
+    <>
+      {/* 1. BLACK BRAND HEADER HEADER */}
+      <Header className="bg-slate-950 dark:bg-black text-white px-4 md:px-8 flex justify-between items-center sticky top-0 z-50 h-16 shadow-md border-b border-slate-900 select-none">
+        {/* Brand Logo & Name */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-white/10 hover:bg-white/20 transition-all rounded-xl flex items-center justify-center overflow-hidden font-bold text-white text-xs shadow-inner flex-shrink-0 border border-white/10 p-1" style={{ height: '10%', width: '25%' }}>
+            <img 
+              src="https://niirncd.icmr.org.in/assets/img/logo/nihrlogo.png" 
+              alt="Logo" 
+              className="w-full h-full object-contain filter brightness-110" 
+              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }} 
+            />
+            
+          </div>
+          <div className="flex flex-col leading-tight">
+            <h1 className="text-sm md:text-base font-black tracking-tight text-white m-0 flex items-center gap-1.5">
+              <span className="italic font-sans text-blue-400">NIHR</span> Intranet <span className="text-blue-400 font-semibold text-xs md:text-sm">| Project & Staff Ledger</span>
+            </h1>
+            {isAuthenticated ? (
+              <span className="text-[9px] font-extrabold uppercase text-emerald-400 tracking-wider">Super Admin Session</span>
+            ) : (
+              <span className="text-[9px] font-semibold text-slate-400 tracking-wider">National Institute for Health Research</span>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col leading-tight">
-          <h1 className="text-sm md:text-base font-extrabold tracking-tight text-[#005EB8] dark:text-blue-400 m-0">
-            Intranet <span className="hidden sm:inline text-slate-400 dark:text-zinc-500 font-semibold ml-1">| Project & Staff Ledger</span>
-          </h1>
-          {isAuthenticated && (
-            <span className="text-[9px] font-black uppercase text-emerald-500 tracking-widest">Super Admin Session</span>
+
+        {/* Desktop Header Actions (Right) */}
+        <div className="hidden md:flex items-center gap-4">
+          {/* Theme Toggle Button */}
+          <Button 
+            type="text" 
+            icon={themeMode === 'dark' ? <BulbFilled className="text-yellow-400 text-base" /> : <BulbOutlined className="text-slate-300 text-base" />} 
+            onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
+            className="text-white hover:bg-white/10 rounded-lg flex items-center justify-center w-9 h-9 border-0"
+          />
+
+          {/* Auth / Admin Control */}
+          {!isAuthenticated ? (
+            <Button 
+              type="primary" 
+              icon={<LoginOutlined />} 
+              className="rounded-lg text-xs font-bold bg-[#005EB8] hover:bg-blue-600 border-0 h-9 px-4 shadow-sm"
+              onClick={() => { setShowLoginModal(true); loadCaptcha(); }}
+            >
+              Admin Login
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Tag color="blue" className="m-0 border-0 text-xs px-3 py-1.5 font-extrabold uppercase tracking-wider flex items-center gap-1.5 rounded-lg bg-blue-950/50 text-blue-300 shadow-sm border border-blue-900/40">
+                <UserOutlined /> {currentAdmin?.name}
+              </Tag>
+              <Button 
+                danger 
+                type="text"
+                icon={<LogoutOutlined />} 
+                className="rounded-lg text-xs font-bold flex items-center justify-center text-slate-300 hover:text-white hover:bg-red-950/40 h-9"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Desktop Navigation Menu (Using xl breakpoint to prevent squishing) */}
-      <div className="hidden xl:flex flex-1 justify-center px-6">
-        <Menu
-          mode="horizontal"
-          selectedKeys={[currentKey]}
-          onClick={handleMenuClick}
-          items={menuItems}
-          className="border-b-0 w-full max-w-3xl bg-transparent dark:bg-transparent font-bold text-xs text-slate-600 dark:text-zinc-300 justify-center"
-          style={{ borderBottom: 'none' }}
-        />
-      </div>
-
-      {/* Desktop Header Actions (Right) (Using xl breakpoint to prevent squishing) */}
-      <div className="hidden xl:flex items-center gap-4">
-        {/* Theme Toggle Button */}
-        <Button 
-          type="text" 
-          icon={themeMode === 'dark' ? <BulbFilled className="text-yellow-500 text-base" /> : <BulbOutlined className="text-base" />} 
-          onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
-          className="text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg flex items-center justify-center w-9 h-9"
-        />
-
-        {/* Auth / Admin Control */}
-        {!isAuthenticated ? (
+        {/* Mobile Actions Menu & Drawer Toggle */}
+        <div className="flex md:hidden items-center gap-2">
           <Button 
-            type="primary" 
-            icon={<LoginOutlined />} 
-            className="rounded-xl text-xs font-bold bg-[#005EB8] hover:bg-blue-600 border-0 h-9 px-4 shadow-sm"
-            onClick={() => { setShowLoginModal(true); loadCaptcha(); }}
-          >
-            Admin Login
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Tag color="blue" className="m-0 border-0 text-xs px-3 py-1.5 font-extrabold uppercase tracking-wider flex items-center gap-1.5 rounded-lg shadow-sm">
-              <UserOutlined /> {currentAdmin?.name}
-            </Tag>
-            <Button 
-              danger 
-              type="text"
-              icon={<LogoutOutlined />} 
-              className="rounded-xl text-xs font-bold flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-950/20 h-9"
-              onClick={handleLogout}
-            >
-              Logout
-            </Button>
-          </div>
-        )}
-      </div>
+            type="text" 
+            icon={themeMode === 'dark' ? <BulbFilled className="text-yellow-400 text-base" /> : <BulbOutlined className="text-slate-300 text-base" />} 
+            onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
+            className="text-white hover:bg-white/10 flex items-center justify-center w-9 h-9"
+          />
+          <Button 
+            type="text" 
+            icon={<MenuOutlined className="text-slate-200 text-base" />} 
+            onClick={() => setDrawerVisible(true)}
+            className="text-white hover:bg-white/10 flex items-center justify-center w-9 h-9"
+          />
+        </div>
+      </Header>
 
-      {/* Mobile Actions Menu & Drawer Toggle (Visible below xl breakpoint) */}
-      <div className="flex xl:hidden items-center gap-2">
-        <Button 
-          type="text" 
-          icon={themeMode === 'dark' ? <BulbFilled className="text-yellow-500 text-base" /> : <BulbOutlined className="text-base" />} 
-          onClick={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
-          className="text-slate-600 dark:text-zinc-300 flex items-center justify-center w-9 h-9"
-        />
-        <Button 
-          type="text" 
-          icon={<MenuOutlined className="text-base" />} 
-          onClick={() => setDrawerVisible(true)}
-          className="text-slate-600 dark:text-zinc-300 flex items-center justify-center w-9 h-9"
-        />
+      {/* 2. SUB-HEADER HORIZONTAL TABS BAR */}
+      <div className="bg-white dark:bg-zinc-900 border-b border-slate-200/80 dark:border-zinc-800/80 sticky top-16 z-40 shadow-sm select-none">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 overflow-x-auto scrollbar-none flex items-center justify-start md:justify-center">
+          <Menu
+            mode="horizontal"
+            selectedKeys={[currentKey]}
+            onClick={handleMenuClick}
+            items={menuItems}
+            className="border-b-0 w-full bg-transparent dark:bg-transparent font-bold text-xs text-slate-700 dark:text-zinc-200 flex justify-start md:justify-center whitespace-nowrap min-w-max"
+            style={{ borderBottom: 'none', height: '46px', lineHeight: '46px' }}
+          />
+        </div>
       </div>
 
       {/* Mobile Drawer */}
@@ -234,6 +242,6 @@ export function AppHeader({
           </div>
         </div>
       </Drawer>
-    </Header>
+    </>
   );
 }
