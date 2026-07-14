@@ -1,0 +1,19 @@
+{
+  "superUsers": [
+    {
+      "id": "it-su-1",
+      "name": "IT Cell (Manish Prajapati)",
+      "email": "itcellcomplaint@gmail.com",
+      "passwordHash": "7f0915db1a3f69d340c7eff71a4e810b8c39c9a3362c8ef0eb33467e07ceb027",
+      "department": "IT"
+    },
+    {
+      "id": "maint-su-1",
+      "name": "Maintenance (Anil Purohit)",
+      "email": "maintenancomplaint@gmail.com",
+      "passwordHash": "0d597854684e2f4f2a7a66d04b68d219ffdfde88da793fc9dcf0c9aa15bf0c10",
+      "department": "Maintenance"
+    }
+  ],
+  "complaints": []
+}
