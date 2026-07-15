@@ -1156,6 +1156,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         <PublicProjectsView
           projects={projects}
           scientists={scientists}
+          projectStaff={projectStaff}
           visibility={visibility}
           isAuthenticated={isAuthenticated}
           handleDownloadBase64File={handleDownloadBase64File}

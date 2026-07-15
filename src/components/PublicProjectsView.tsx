@@ -3,11 +3,12 @@ import { Card, Table, Tag, Button, Empty, Row, Col, Input, Select, Space, Badge,
 import { 
   ProjectOutlined, SearchOutlined, DownloadOutlined, FilePdfOutlined, CalendarOutlined, BankOutlined, UserOutlined
 } from '@ant-design/icons';
-import { Project, Scientist, VisibilityConfig } from '../types';
+import { Project, Scientist, VisibilityConfig, ProjectStaff } from '../types';
 
 interface PublicProjectsViewProps {
   projects: Project[];
   scientists: Scientist[];
+  projectStaff: ProjectStaff[];
   visibility: VisibilityConfig | null;
   isAuthenticated: boolean;
   handleDownloadBase64File: (fileName: string, fileData: string) => void;
@@ -16,6 +17,7 @@ interface PublicProjectsViewProps {
 export function PublicProjectsView({
   projects,
   scientists,
+  projectStaff,
   visibility,
   isAuthenticated,
   handleDownloadBase64File
@@ -361,6 +363,92 @@ export function PublicProjectsView({
               </Card>
             </Col>
           </Row>
+
+          {/* Associated Project Staff Section */}
+          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-zinc-800">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center">
+                  <UserOutlined className="text-base" />
+                </span>
+                <div>
+                  <h4 className="text-sm font-black text-slate-800 dark:text-zinc-200 m-0">Associated Project Staff</h4>
+                  <p className="text-[10px] text-slate-400 m-0">List of personnel appointed or working under this project</p>
+                </div>
+              </div>
+              <Badge 
+                count={(projectStaff || []).filter(ps => ps.projectId === selectedProject.id).length} 
+                showZero 
+                className="font-bold text-xs" 
+                color="#6366F1" 
+              />
+            </div>
+
+            {(projectStaff || []).filter(ps => ps.projectId === selectedProject.id).length > 0 ? (
+              <Table
+                size="small"
+                pagination={{ pageSize: 5 }}
+                dataSource={(projectStaff || []).filter(ps => ps.projectId === selectedProject.id)}
+                rowKey="id"
+                scroll={{ x: 'max-content' }}
+                columns={[
+                  {
+                    title: 'Employee Code',
+                    dataIndex: 'employeeCode',
+                    key: 'employeeCode',
+                    className: 'font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400'
+                  },
+                  {
+                    title: 'Name',
+                    dataIndex: 'name',
+                    key: 'name',
+                    className: 'font-bold text-slate-800 dark:text-zinc-200'
+                  },
+                  {
+                    title: 'Designation',
+                    dataIndex: 'designation',
+                    key: 'designation',
+                    className: 'font-medium text-slate-600 dark:text-zinc-400'
+                  },
+                  {
+                    title: 'Date of Joining',
+                    dataIndex: 'doj',
+                    key: 'doj',
+                    render: (date: string) => <span className="text-xs text-slate-500 dark:text-zinc-500">{date || 'N/A'}</span>
+                  },
+                  {
+                    title: 'Category',
+                    dataIndex: 'category',
+                    key: 'category',
+                    render: (cat: string) => <Tag className="rounded-md font-semibold text-[10px] px-1.5 py-0 bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300">{cat || 'UR'}</Tag>
+                  },
+                  {
+                    title: 'Qualification',
+                    dataIndex: 'educationalQualification',
+                    key: 'educationalQualification',
+                    className: 'text-xs text-slate-500 dark:text-zinc-400'
+                  },
+                  {
+                    title: 'Status',
+                    dataIndex: 'status',
+                    key: 'status',
+                    render: (s: string) => (
+                      <Tag 
+                        color={s === 'Active' ? 'success' : 'default'} 
+                        className="font-bold text-[10px] uppercase rounded-md tracking-wider px-2 py-0"
+                      >
+                        {s}
+                      </Tag>
+                    )
+                  }
+                ]}
+              />
+            ) : (
+              <div className="text-center py-8 bg-slate-50/50 dark:bg-zinc-950/20 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
+                <Empty description={<span className="text-xs text-slate-400">No project staff currently assigned to this project</span>} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
