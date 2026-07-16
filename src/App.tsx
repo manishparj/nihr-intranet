@@ -661,8 +661,8 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           }
         }
         setBroadcasts(sorted);
-      } catch (e) {
-        console.error("Failed to poll broadcasts", e);
+      } catch (e: any) {
+        console.warn("Failed to poll broadcasts:", e?.message || e);
       }
     };
 
