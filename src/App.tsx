@@ -33,6 +33,7 @@ import { PublicProjectsView } from './components/PublicProjectsView';
 import { PublicProjectStaffView } from './components/PublicProjectStaffView';
 import { PublicPermanentStaffView } from './components/PublicPermanentStaffView';
 import { PublicYPConsultantsView } from './components/PublicYPConsultantsView';
+import { calculateIcmrTenureStatus } from './utils/experience';
 
 const { Header, Content, Footer, Sider } = Layout;
 
@@ -1177,16 +1178,16 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       );
     }
 
-    if (currentKey === 'public-permanent') {
-      return (
-        <PublicPermanentStaffView
-          permanentStaff={permanentStaff}
-          visibility={visibility}
-          isAuthenticated={isAuthenticated}
-          onOpenDetails={openStaffDetailsModal}
-        />
-      );
-    }
+    // if (currentKey === 'public-permanent') {
+    //   return (
+    //     <PublicPermanentStaffView
+    //       permanentStaff={permanentStaff}
+    //       visibility={visibility}
+    //       isAuthenticated={isAuthenticated}
+    //       onOpenDetails={openStaffDetailsModal}
+    //     />
+    //   );
+    // }
 
     if (currentKey === 'public-ypc') {
       return (
@@ -2303,52 +2304,89 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       🎓 Historical Service Experience Records & Tenure Analysis
                     </h4>
 
+                    {/* ICMR 5-Year Tenure Alert Banner */}
+                    {(() => {
+                      const project = projects.find(p => p.id === viewDetailRecord.projectId);
+                      const tenure = calculateIcmrTenureStatus(viewDetailRecord, project);
+                      
+                      let alertTitle = '';
+                      let alertDescription = '';
+                      let alertColorClass = '';
+                      
+                      if (tenure.isRedFlag) {
+                        alertTitle = tenure.isExceeded 
+                          ? '🚨 RED FLAG: EXCEEDED SERVICE LIMIT' 
+                          : '⚠️ RED FLAG: CRITICAL SERVICE CUT-OFF ARRIVING';
+                        alertDescription = `This staff member is within one month of (or has exceeded) their calculated Cut-Off Date of ${tenure.cutOffDateStr} (${tenure.cutOffReason}). Remaining period: ${tenure.remainingText}.`;
+                        alertColorClass = 'bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900/40';
+                      } else {
+                        alertTitle = '✅ Service Tenure Status Stable';
+                        alertDescription = `The staff member's service tenure is stable. Calculated Cut-Off Date: ${tenure.cutOffDateStr} (${tenure.cutOffReason}). Remaining period: ${tenure.remainingText}.`;
+                        alertColorClass = 'bg-emerald-50 dark:bg-emerald-950/10 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/20';
+                      }
+                      
+                      return (
+                        <div className={`p-3 rounded-lg border mb-4 text-xs ${alertColorClass}`}>
+                          <div className="font-bold mb-1 flex items-center gap-1.5">{alertTitle}</div>
+                          <div>{alertDescription}</div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Year-Months-Days Breakdown Grid */}
                     {(() => {
-                      const expYMD = calculateStaffExperienceYMD(viewDetailRecord);
+                      const project = projects.find(p => p.id === viewDetailRecord.projectId);
+                      const tenure = calculateIcmrTenureStatus(viewDetailRecord, project);
+                      
                       return (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
                           <div className="bg-slate-50 dark:bg-zinc-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-center">
-                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ICMR Exp</div>
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Prev ICMR Exp</div>
                             <div className="text-sm font-black text-slate-700 dark:text-zinc-200 mt-1 font-mono">
-                              {formatYMD(expYMD.icmr)}
+                              {formatYMD(tenure.prevIcmrYMD)}
                             </div>
-                            <div className="text-[9px] text-slate-400 italic">Years-Months-Days</div>
+                            <div className="text-[9px] text-slate-400 italic">Y-M-D (Previous)</div>
                           </div>
                           
                           <div className="bg-slate-50 dark:bg-zinc-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-center">
-                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Non-ICMR Exp</div>
+                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Current Exp</div>
                             <div className="text-sm font-black text-slate-700 dark:text-zinc-200 mt-1 font-mono">
-                              {formatYMD(expYMD.nonIcmr)}
+                              {formatYMD(tenure.currentIcmrYMD)}
                             </div>
-                            <div className="text-[9px] text-slate-400 italic">Years-Months-Days</div>
+                            <div className="text-[9px] text-slate-400 italic">Y-M-D (DOJ to Today)</div>
                           </div>
 
                           <div className="bg-blue-50/40 dark:bg-blue-950/10 p-2.5 rounded-lg border border-blue-100/30 dark:border-blue-900/20 text-center">
-                            <div className="text-[10px] text-blue-500 font-bold uppercase tracking-wider">Current Exp</div>
+                            <div className="text-[10px] text-blue-500 font-bold uppercase tracking-wider">Total ICMR EXP</div>
                             <div className="text-sm font-black text-blue-600 dark:text-blue-400 mt-1 font-mono">
-                              {formatYMD(expYMD.current)}
+                              {formatYMD(tenure.totalIcmrYMD)}
                             </div>
-                            <div className="text-[9px] text-blue-400 italic">DOJ to Today</div>
+                            <div className="text-[9px] text-blue-400 italic">Prev + Current</div>
                           </div>
 
                           <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-2.5 rounded-lg border border-indigo-100/40 dark:border-indigo-900/30 text-center">
-                            <div className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Total Experience</div>
+                            <div className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Non-ICMR Exp</div>
                             <div className="text-sm font-black text-indigo-600 dark:text-indigo-400 mt-1 font-mono">
-                              {formatYMD(expYMD.total)}
+                              {formatYMD(tenure.nonIcmrYMD)}
                             </div>
-                            <div className="text-[9px] text-indigo-400 italic">Combined Y-M-D</div>
+                            <div className="text-[9px] text-indigo-400 italic">Previous Non-ICMR</div>
                           </div>
                         </div>
                       );
                     })()}
 
-                    <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-100/50 dark:border-blue-900/30 mb-3 text-xs flex justify-between items-center">
-                      <span className="font-semibold text-blue-800 dark:text-blue-300">Cumulative Experience Month Totals:</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400">
-                        {viewDetailRecord.totalExpMonths || 0} Months (ICMR: {viewDetailRecord.icmrExpMonths || 0} | Non-ICMR: {viewDetailRecord.nonIcmrExpMonths || 0})
-                      </span>
-                    </div>
+                    {(() => {
+                      const project = projects.find(p => p.id === viewDetailRecord.projectId);
+                      const tenure = calculateIcmrTenureStatus(viewDetailRecord, project);
+                      return (
+                        <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-100/50 dark:border-blue-900/30 mb-3 text-xs flex justify-between items-center">
+                          <span className="font-semibold text-blue-800 dark:text-blue-300">Cumulative Experience Month Totals (Total ICMR + Non-ICMR):</span>
+                          <span className="font-bold text-blue-600 dark:text-blue-400 font-mono">
+                            {tenure.cumulativeTotalMonths.toFixed(1)} Months ({formatYMD(tenure.cumulativeYMD)})
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     <div className="space-y-4">
                       {/* Previous ICMR Experience */}

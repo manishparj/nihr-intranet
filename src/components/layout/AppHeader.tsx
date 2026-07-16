@@ -45,7 +45,7 @@ export function AppHeader({
       ...(visibility?.modules.scientists ? [{ key: 'public-scientists', icon: <UserOutlined />, label: 'Scientists' }] : []),
       ...(visibility?.modules.projects ? [{ key: 'public-projects', icon: <ProjectOutlined />, label: 'Projects Ledger' }] : []),
       ...(visibility?.modules.projectStaff ? [{ key: 'public-pstaff', icon: <SolutionOutlined />, label: 'Project Staff' }] : []),
-      ...(visibility?.modules.permanentStaff ? [{ key: 'public-permanent', icon: <TeamOutlined />, label: 'Permanent Staff' }] : []),
+      // ...(visibility?.modules.permanentStaff ? [{ key: 'public-permanent', icon: <TeamOutlined />, label: 'Permanent Staff' }] : []),
       ...(visibility?.modules.ypConsultants ? [{ key: 'public-ypc', icon: <StarOutlined />, label: 'YP & Consultants' }] : []),
       { key: 'public-salary-portal', icon: <PrinterOutlined />, label: 'Salary Portal' },
       { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Complaints Desk' }
@@ -63,7 +63,7 @@ export function AppHeader({
           { key: 'admin-scientists', icon: <UserOutlined />, label: 'Scientists Registry' },
           { key: 'admin-projects', icon: <ProjectOutlined />, label: 'Projects Ledger' },
           { key: 'admin-project-staff', icon: <SolutionOutlined />, label: 'Project Staff' },
-          { key: 'admin-permanent-staff', icon: <TeamOutlined />, label: 'Permanent Staff' },
+          // { key: 'admin-permanent-staff', icon: <TeamOutlined />, label: 'Permanent Staff' },
           { key: 'admin-yp-consultants', icon: <StarOutlined />, label: 'YP & Consultants' },
           { key: 'admin-salaries', icon: <PrinterOutlined />, label: 'Staff Salaries' }
         ]
@@ -114,7 +114,7 @@ export function AppHeader({
             {isAuthenticated ? (
               <span className="text-[9px] font-extrabold uppercase text-emerald-400 tracking-wider">Super Admin Session</span>
             ) : (
-              <span className="text-[9px] font-semibold text-slate-400 tracking-wider">National Institute for Health Research</span>
+              <span className="text-[9px] font-semibold text-slate-400 tracking-wider">National Institute of Health Research</span>
             )}
           </div>
         </div>

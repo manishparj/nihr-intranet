@@ -557,21 +557,6 @@ export const ComplaintPortal: React.FC = () => {
                             type="info" 
                             showIcon 
                           />
-                          <Alert 
-                            title="📂 File Tracking" 
-                            description="Kindly mention the official File diary number in the description for fast-track retrieval and approval." 
-                            type="info" 
-                            showIcon 
-                          />
-                        </div>
-                      </Card>
-
-                      <Card size="small" title={<span className="font-bold text-xs text-slate-700 dark:text-zinc-200">📞 Urgent Out-Of-Hours Desk</span>} className="rounded-xl border-slate-200 bg-amber-50/50 dark:bg-amber-950/10">
-                        <div className="text-xs space-y-1 text-slate-600 dark:text-zinc-400">
-                          <p>For emergencies (flooding, electrical short circuit, server room failure):</p>
-                          <p className="font-bold text-[#005EB8] mt-1.5">📞 IT Hotline: +91 11-26588920 (Ext. 402)</p>
-                          <p className="font-bold text-[#005EB8]">📞 Civil Maintenance: +91 11-26588931</p>
-                          <p className="font-bold text-[#005EB8]">📂 Main Admin Registry: ext-admin@nihr.res.in</p>
                         </div>
                       </Card>
                     </Space>

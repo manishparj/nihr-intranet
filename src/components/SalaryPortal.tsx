@@ -441,7 +441,7 @@ const buildSlipHTML = (activeSlip: SalarySlip, forPrint: boolean) => {
           <div class="header">
             <img src="https://niirncd.icmr.org.in/assets/img/logo/nihrlogo.png" alt="ICMR Logo" />
             <div>
-              <div class="org-name">ICMR-National Institute for Health Research, Jodhpur</div>
+              <div class="org-name">ICMR-National Institute of Health Research, Jodhpur</div>
               <div class="org-sub">Ministry of Health & Family Welfare, Government of India</div>
             </div>
           </div>
@@ -543,7 +543,7 @@ const buildSlipHTML = (activeSlip: SalarySlip, forPrint: boolean) => {
 
             <!-- Footer -->
             <div class="footer">
-              <div class="contact">ICMR&ndash;National Institute for Health Research, Jodhpur</div>
+              <div class="contact">ICMR&ndash;National Institute of Health Research, Jodhpur</div>
               <div class="contact">Website: <a href="https://niirncd.icmr.org.in/">https://niirncd.icmr.org.in/</a> &nbsp;|&nbsp; Email: <a href="mailto:director-niirncd@icmr.gov.in">director-niirncd@icmr.gov.in</a></div>
               <div style="margin-top: 3px;">System-generated document &bull; Valid without signature</div>
             </div>
