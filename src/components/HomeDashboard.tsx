@@ -1,18 +1,17 @@
 import { useState } from 'react';
 import { Row, Col } from 'antd';
 import { NotificationOutlined, FilePdfOutlined } from '@ant-design/icons';
-import { 
-  VisibilityConfig, Announcement, BroadcastMessage, Event as EventType, 
-  Scientist, ProjectStaff, PermanentStaff, YPConsultant, Circular, 
-  FormDocument 
+import {
+  VisibilityConfig, Announcement, BroadcastMessage, Event as EventType,
+  Scientist, ProjectStaff, PermanentStaff, YPConsultant, Circular,
+  FormDocument
 } from '../types';
 import { BroadcastFeed } from './BroadcastFeed';
 
 // Modular Subcomponents
-import { SeminarsEvents } from './dashboard/SeminarsEvents';
-import { CelebrationsMilestones } from './dashboard/CelebrationsMilestones';
 import { OfficeCirculars } from './dashboard/OfficeCirculars';
 import { FormsTemplates } from './dashboard/FormsTemplates';
+import { SeminarsEventsCelebrations } from './dashboard/SeminarsEventsCelebrations';
 
 interface HomeDashboardProps {
   visibility: VisibilityConfig | null;
@@ -100,52 +99,51 @@ export function HomeDashboard({
   const localBirthdays = getWeeklyBirthdaysLocal();
   const localAnniversaries = getWeeklyAnniversariesLocal();
 
-  const filteredCirculars = circulars.filter(c => 
+  const filteredCirculars = circulars.filter(c =>
     c.title.toLowerCase().includes(circularSearchText.toLowerCase()) ||
     (c.fileName && c.fileName.toLowerCase().includes(circularSearchText.toLowerCase()))
   );
   const paginatedCirculars = filteredCirculars.slice((circularPage - 1) * 5, circularPage * 5);
 
-  const filteredForms = forms.filter(f => 
+  const filteredForms = forms.filter(f =>
     f.title.toLowerCase().includes(formSearchText.toLowerCase()) ||
     (f.fileName && f.fileName.toLowerCase().includes(formSearchText.toLowerCase()))
   );
   const paginatedForms = filteredForms.slice((formPage - 1) * 5, formPage * 5);
 
   return (
-    <div className="space-y-6">
-      {/* 1. Latest Announcements left to right marquee */}
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full overflow-x-hidden">
+      {/* 1. Latest Announcements ticker */}
       {visibility?.modules.announcements && (
-        <div className="bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/40 rounded-xl p-2.5 flex items-center gap-3 overflow-hidden shadow-sm">
-          <div className="flex-shrink-0 flex items-center gap-2 bg-[#075E54] text-white px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider animate-pulse">
+        <div className="bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/40 rounded-xl p-2 sm:p-2.5 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 overflow-hidden shadow-sm">
+          <div className="flex-shrink-0 flex items-center gap-2 bg-[#075E54] text-white px-3 py-1 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider w-fit">
             <NotificationOutlined /> Official Board Ticker
           </div>
-          <div className="flex-1 overflow-hidden relative">
-            <div className="animate-marquee-rtl hover:[animation-play-state:paused] whitespace-nowrap inline-flex gap-12">
+          <div className="flex-1 min-w-0 overflow-hidden relative">
+            <div className="animate-marquee-rtl hover:[animation-play-state:paused] whitespace-nowrap inline-flex gap-8 sm:gap-12">
               {announcements.map((ann, idx) => (
-                <span key={ann.id || idx} className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-zinc-200">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                <span key={ann.id || idx} className="inline-flex items-center gap-2 text-[11px] sm:text-xs font-bold text-slate-700 dark:text-zinc-200">
+                  <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-emerald-500 rounded-full shrink-0" />
                   {ann.title}
                   {ann.fileName && (
-                    <a href={ann.fileData} target="_blank" rel="noreferrer" className="text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-extrabold ml-1">
+                    <a href={ann.fileData} target="_blank" rel="noreferrer" className="text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-extrabold ml-1 shrink-0">
                       <FilePdfOutlined /> View Doc
                     </a>
                   )}
                 </span>
               ))}
               {announcements.length === 0 && (
-                <span className="text-xs text-slate-400 font-medium">No active institutional announcements listed today.</span>
+                <span className="text-[11px] sm:text-xs text-slate-400 font-medium">No active institutional announcements listed today.</span>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 2. Top-Level Layout Grid (Broadcast, Today's Seminars, Birthdays/Milestones) */}
+      {/* 2. Broadcast / Seminars & Events / Office Circulars */}
       <Row gutter={[16, 16]} className="items-stretch">
-        {/* Left: WhatsApp-theme Broadcast Bulletin Channel */}
         {visibility?.modules.broadcast && (
-          <Col xs={24} lg={12} className="flex flex-col">
+          <Col xs={24} md={12} lg={8} className="flex flex-col min-w-0">
             <BroadcastFeed
               messages={broadcasts}
               isAdmin={false}
@@ -156,42 +154,35 @@ export function HomeDashboard({
           </Col>
         )}
 
-        {/* Middle: Today's Events (Scientific Events & Seminars) */}
-        <Col xs={24} md={12} lg={6} className="flex flex-col">
-          <SeminarsEvents 
-            events={events} 
-            visible={!!visibility?.modules.events} 
-          />
-        </Col>
-
-        {/* Right: Birthdays & Celebrations & Service Milestones */}
-        <Col xs={24} md={12} lg={6} className="flex flex-col">
-          <CelebrationsMilestones
+        <Col xs={24} md={12} lg={8} className="flex flex-col min-w-0">
+          <SeminarsEventsCelebrations
+            events={events}
             localBirthdays={localBirthdays}
             localAnniversaries={localAnniversaries}
+            eventsVisible={!!visibility?.modules.events}
             birthdaysVisible={!!visibility?.modules.birthdays}
             anniversariesVisible={!!visibility?.modules.workAnniversaries}
           />
         </Col>
+
+        <Col xs={24} md={24} lg={8} className="flex flex-col min-w-0">
+          <OfficeCirculars
+            filteredCirculars={filteredCirculars}
+            paginatedCirculars={paginatedCirculars}
+            circularSearchText={circularSearchText}
+            setCircularSearchText={setCircularSearchText}
+            circularPage={circularPage}
+            setCircularPage={setCircularPage}
+            handleDownloadBase64File={handleDownloadBase64File}
+            visible={!!visibility?.modules.circulars}
+          />
+        </Col>
       </Row>
 
-      {/* 3. Standalone Institutional Office Circulars & Office Forms & Templates Card Row */}
-      {(visibility?.modules.circulars || visibility?.modules.forms) && (
+      {/* 3. Office Forms & Templates */}
+      {/* {visibility?.modules.forms && (
         <Row gutter={[16, 16]} className="items-stretch">
-          <Col xs={24} lg={12} className="flex flex-col">
-            <OfficeCirculars
-              filteredCirculars={filteredCirculars}
-              paginatedCirculars={paginatedCirculars}
-              circularSearchText={circularSearchText}
-              setCircularSearchText={setCircularSearchText}
-              circularPage={circularPage}
-              setCircularPage={setCircularPage}
-              handleDownloadBase64File={handleDownloadBase64File}
-              visible={!!visibility?.modules.circulars}
-            />
-          </Col>
-
-          <Col xs={24} lg={12} className="flex flex-col">
+          <Col xs={24} className="flex flex-col min-w-0">
             <FormsTemplates
               filteredForms={filteredForms}
               paginatedForms={paginatedForms}
@@ -204,7 +195,7 @@ export function HomeDashboard({
             />
           </Col>
         </Row>
-      )}
+      )} */}
     </div>
   );
 }

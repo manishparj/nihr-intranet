@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   Layout, Menu, Button, Card, Table, Modal, Input, Row, Col, Space, Badge, Radio, 
   Switch, Tag, Spin, Popconfirm, Avatar, Divider, message, ConfigProvider, theme, Empty,
-  App as AntdApp, Tabs, Breadcrumb, Pagination
+  App as AntdApp, Tabs, Breadcrumb, Pagination, Grid
 } from 'antd';
 import { 
   UserOutlined, ProjectOutlined, SolutionOutlined, FilePdfOutlined, 
@@ -36,6 +36,17 @@ import { PublicYPConsultantsView } from './components/PublicYPConsultantsView';
 import { calculateIcmrTenureStatus } from './utils/experience';
 
 const { Header, Content, Footer, Sider } = Layout;
+const { useBreakpoint } = Grid;
+
+/** Debounce hook: delays reacting to a fast-changing value (e.g. search input) */
+function useDebouncedValue<T>(value: T, delayMs = 250): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
 
 export const playBroadcastNotification = () => {
   try {
@@ -102,6 +113,8 @@ interface InnerAppProps {
 
 function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const { message } = AntdApp.useApp();
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
 
   // Authentication & Profile State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -144,7 +157,8 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const [loadingData, setLoadingData] = useState(true);
 
   // Global search filters
-  const [searchText, setSearchText] = useState('');
+  const [searchTextRaw, setSearchTextRaw] = useState('');
+  const searchText = useDebouncedValue(searchTextRaw, 200);
 
   // Editing Modals state
   const [activeModal, setActiveModal] = useState<'scientist' | 'project' | 'pstaff' | 'perm' | 'ypc' | 'circular' | 'form' | 'announcement' | 'event' | 'admin' | null>(null);
@@ -155,11 +169,15 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const [viewDetailType, setViewDetailType] = useState<'scientist' | 'pstaff' | 'perm' | 'ypc' | null>(null);
   const [viewDetailModalVisible, setViewDetailModalVisible] = useState(false);
 
-  const openStaffDetailsModal = (record: any, type: 'scientist' | 'pstaff' | 'perm' | 'ypc') => {
+  const openStaffDetailsModal = useCallback((record: any, type: 'scientist' | 'pstaff' | 'perm' | 'ypc') => {
     setViewDetailRecord(record);
     setViewDetailType(type);
     setViewDetailModalVisible(true);
-  };
+  }, []);
+
+  // Responsive sizing helpers (single source of truth, used across all Modals/Inputs)
+  const modalWidth = (desktopPx: number) => (isMobile ? '96%' : desktopPx);
+  const searchInputWidth = isMobile ? '100%' : 220;
 
   // No salary slip modal state needed anymore
 
@@ -312,42 +330,57 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     document.body.removeChild(link);
   };
 
-  const exportScientistsCSV = () => {
-    const headers = [
+  // ==========================================
+  // GENERIC CSV EXPORT (replaces 5 near-duplicate export* functions)
+  // Each dataset just declares its headers + a row-mapper; all the
+  // file-naming / blob / download plumbing lives in one place.
+  // ==========================================
+  type CsvExportConfig<T> = {
+    headers: string[];
+    mapRow: (item: T) => any[];
+    fileName: string;
+  };
+
+  const exportDataset = <T,>(data: T[], config: CsvExportConfig<T>) => {
+    downloadCSV(config.headers, data.map(config.mapRow), config.fileName);
+  };
+
+  const scientistCsvConfig: CsvExportConfig<Scientist> = {
+    headers: [
       "ID", "Name", "Date of Birth", "Date of Joining", "Designation",
       "Govt Email", "Personal Email", "Phone", "Employee Code", "Gender",
       "Blood Group", "Emergency Contact", "Address", "Department Location",
       "Room Number", "Category", "Status", "Last Working Date", "No Dues Cleared"
-    ];
-    const rows = scientists.map(s => [
+    ],
+    mapRow: (s) => [
       s.id, s.name, s.dob, s.doj, s.designation,
       s.govtEmail, s.personalEmail, s.phone, s.employeeCode, s.gender,
       s.bloodGroup, s.emergencyContact, s.address, s.departmentLocation,
       s.roomNumber, s.category, s.status, s.lastWorkingDate || '', s.noDuesCleared ? 'Yes' : 'No'
-    ]);
-    downloadCSV(headers, rows, "All_Scientists_Details.csv");
+    ],
+    fileName: "All_Scientists_Details.csv"
   };
 
-  const exportPermanentStaffCSV = () => {
-    const headers = [
+  const permanentStaffCsvConfig: CsvExportConfig<PermanentStaff> = {
+    headers: [
       "ID", "Name", "Date of Birth", "Date of Joining", "Designation",
       "Govt Email", "Personal Email", "Phone", "Employee Code", "Gender",
       "Blood Group", "Emergency Contact", "Address", "Aadhaar Number", "PAN Number",
       "Department Location", "Room Number", "Category", "Account Number", "IFSC Code",
       "Bank Name", "Status", "Last Working Date", "Leaving Reason", "No Dues Cleared"
-    ];
-    const rows = permanentStaff.map(p => [
+    ],
+    mapRow: (p) => [
       p.id, p.name, p.dob, p.doj, p.designation,
       p.govtEmail, p.personalEmail, p.phone, p.employeeCode, p.gender,
       p.bloodGroup, p.emergencyContact, p.address, p.aadhaarNumber, p.panNumber,
       p.departmentLocation, p.roomNumber, p.category, p.accountNumber, p.ifscCode,
       p.bankName, p.status, p.lastWorkingDate || '', p.leavingReason || '', p.noDuesCleared ? 'Yes' : 'No'
-    ]);
-    downloadCSV(headers, rows, "All_Permanent_Staff_Details.csv");
+    ],
+    fileName: "All_Permanent_Staff_Details.csv"
   };
 
-  const exportProjectStaffCSV = () => {
-    const headers = [
+  const projectStaffCsvConfig: CsvExportConfig<ProjectStaff> = {
+    headers: [
       "ID", "Project ID", "PI Scientist ID", "Name", "Date of Birth",
       "Date of Joining", "Designation", "Email", "Phone", "Gender",
       "Blood Group", "Emergency Contact", "Address", "Aadhaar Number", "PAN Number",
@@ -357,8 +390,8 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       "Previous ICMR Experience", "Previous Non-ICMR Experience", "ICMR Exp Months", "Non-ICMR Exp Months", "Total Exp Months",
       "Father's Name", "Father's Mobile Number", "Mother's Name", "Mother's Mobile Number",
       "Marital Status", "Spouse Name", "Spouse Mobile Number"
-    ];
-    const rows = projectStaff.map(p => [
+    ],
+    mapRow: (p) => [
       p.id, p.projectId, p.scientistId, p.name, p.dob,
       p.doj, p.designation, p.email, p.phone, p.gender,
       p.bloodGroup, p.emergencyContact, p.address, p.aadhaarNumber, p.panNumber,
@@ -369,43 +402,49 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       p.icmrExpMonths ?? 0, p.nonIcmrExpMonths ?? 0, p.totalExpMonths ?? 0,
       p.fatherName || '', p.fatherPhone || '', p.motherName || '', p.motherPhone || '',
       p.maritalStatus || '', p.spouseName || '', p.spousePhone || ''
-    ]);
-    downloadCSV(headers, rows, "All_Project_Staff_Details.csv");
+    ],
+    fileName: "All_Project_Staff_Details.csv"
   };
 
-  const exportProjectsCSV = () => {
-    const headers = [
+  const projectsCsvConfig: CsvExportConfig<Project> = {
+    headers: [
       "ID", "Project Title/Name", "Short Name", "Funding Type", "Status",
       "Start Date", "End Date", "Total Budget Allocated", "Principal Investigator (Scientist ID)",
       "Provisional UCs count", "Final Report Title", "Final Report File Name"
-    ];
-    const rows = projects.map(p => [
+    ],
+    mapRow: (p) => [
       p.id, p.name, p.shortName, p.type, p.status,
       p.startDate, p.endDate, p.budget, p.piId,
       (p.provisionalUCs || []).length,
       p.finalReport?.title || 'N/A',
       p.finalReport?.fileName || 'N/A'
-    ]);
-    downloadCSV(headers, rows, "All_Project_Details.csv");
+    ],
+    fileName: "All_Project_Details.csv"
   };
 
-  const exportYPConsultantCSV = () => {
-    const headers = [
+  const ypConsultantCsvConfig: CsvExportConfig<YPConsultant> = {
+    headers: [
       "ID", "Name", "Date of Birth", "Date of Joining", "Full Designation",
       "Designation Type", "Email", "Phone", "Gender", "Blood Group",
       "Employee Code", "Aadhaar Number", "PAN Number", "Account Number", "IFSC Code",
       "Bank Name", "Department Location", "Room Number", "Address", "Emergency Contact",
       "Category", "Status", "Last Working Date", "Leaving Reason", "No Dues Cleared"
-    ];
-    const rows = ypConsultants.map(y => [
+    ],
+    mapRow: (y) => [
       y.id, y.name, y.dob, y.doj, y.fullDesignation,
       y.designationType, y.email, y.phone, y.gender, y.bloodGroup,
       y.employeeCode, y.aadhaarNumber, y.panNumber, y.accountNumber, y.ifscCode,
       y.bankName, y.departmentLocation, y.roomNumber, y.address, y.emergencyContact,
       y.category, y.status, y.lastWorkingDate || '', y.leavingReason || '', y.noDuesCleared ? 'Yes' : 'No'
-    ]);
-    downloadCSV(headers, rows, "All_YP_and_Consultants_Details.csv");
+    ],
+    fileName: "All_YP_and_Consultants_Details.csv"
   };
+
+  const exportScientistsCSV = () => exportDataset(scientists, scientistCsvConfig);
+  const exportPermanentStaffCSV = () => exportDataset(permanentStaff, permanentStaffCsvConfig);
+  const exportProjectStaffCSV = () => exportDataset(projectStaff, projectStaffCsvConfig);
+  const exportProjectsCSV = () => exportDataset(projects, projectsCsvConfig);
+  const exportYPConsultantCSV = () => exportDataset(ypConsultants, ypConsultantCsvConfig);
 
   const exportAllStaffIndividually = () => {
     exportScientistsCSV();
@@ -871,10 +910,11 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   };
 
   // ==========================================
-  // TABLE COLUMN REPRESENTATIONS
+  // TABLE COLUMN REPRESENTATIONS (memoized — only recompute when their
+  // real inputs change, instead of rebuilding on every render)
   // ==========================================
 
-  const getScientistColumns = () => [
+  const scientistColumns = useMemo(() => [
     { title: 'Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
     { title: 'Scientist Name', dataIndex: 'name', key: 'name', font: 'bold', sorter: (a: any, b: any) => a.name.localeCompare(b.name) },
     { title: 'Designation', dataIndex: 'designation', key: 'designation' },
@@ -887,6 +927,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     ...(isAuthenticated ? [{
       title: 'Actions',
       key: 'actions',
+      fixed: (isMobile ? undefined : 'right') as any,
       render: (_: any, rec: Scientist) => (
         <Space size="middle">
           <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('scientist'); }} />
@@ -894,9 +935,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         </Space>
       )
     }] : [])
-  ];
+  ], [isAuthenticated, visibility, isMobile]);
 
-  const getProjectColumns = () => [
+  const projectColumns = useMemo(() => [
     { title: 'Short Code', dataIndex: 'shortName', key: 'shortName', sorter: (a: any, b: any) => a.shortName.localeCompare(b.shortName) },
     { title: 'Full Scientific Name', dataIndex: 'name', key: 'name', width: 300 },
     { title: 'Type', dataIndex: 'type', key: 'type', render: (t: string) => <Tag color="orange">{t}</Tag> },
@@ -951,6 +992,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     ...(isAuthenticated ? [{
       title: 'Actions',
       key: 'actions',
+      fixed: (isMobile ? undefined : 'right') as any,
       render: (_: any, rec: Project) => (
         <Space size="middle">
           <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('project'); }} />
@@ -958,9 +1000,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         </Space>
       )
     }] : [])
-  ];
+  ], [isAuthenticated, scientists, isMobile]);
 
-  const getProjectStaffColumns = () => [
+  const projectStaffColumns = useMemo(() => [
     { title: 'Temp Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => (a.employeeCode || '').localeCompare(b.employeeCode || '') },
     { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold', sorter: (a: any, b: any) => a.name.localeCompare(b.name) },
     { title: 'Designation', dataIndex: 'designation', key: 'designation' },
@@ -984,6 +1026,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     ...(isAuthenticated ? [{
       title: 'Actions',
       key: 'actions',
+      fixed: (isMobile ? undefined : 'right') as any,
       render: (_: any, rec: ProjectStaff) => (
         <Space size="middle">
           <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('pstaff'); }} />
@@ -991,9 +1034,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         </Space>
       )
     }] : [])
-  ];
+  ], [isAuthenticated, visibility, projects, scientists, isMobile]);
 
-  const getPermanentStaffColumns = () => [
+  const permanentStaffColumns = useMemo(() => [
     { title: 'Perm Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
     { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold' },
     { title: 'Designation', dataIndex: 'designation', key: 'designation' },
@@ -1010,6 +1053,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     ...(isAuthenticated ? [{
       title: 'Actions',
       key: 'actions',
+      fixed: (isMobile ? undefined : 'right') as any,
       render: (_: any, rec: PermanentStaff) => (
         <Space size="middle">
           <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('perm'); }} />
@@ -1017,9 +1061,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         </Space>
       )
     }] : [])
-  ];
+  ], [isAuthenticated, visibility, isMobile]);
 
-  const getYPConsultantColumns = () => [
+  const ypConsultantColumns = useMemo(() => [
     { title: 'Temp/CONS Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
     { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold' },
     { title: 'Designation Type', dataIndex: 'designationType', key: 'designationType', render: (val: string) => <Tag color={val === 'Consultant' ? 'magenta' : 'cyan'}>{val}</Tag> },
@@ -1030,6 +1074,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     ...(isAuthenticated ? [{
       title: 'Actions',
       key: 'actions',
+      fixed: (isMobile ? undefined : 'right') as any,
       render: (_: any, rec: YPConsultant) => (
         <Space size="middle">
           <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('ypc'); }} />
@@ -1037,9 +1082,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         </Space>
       )
     }] : [])
-  ];
+  ], [isAuthenticated, visibility, isMobile]);
 
-  const getCircularColumns = () => [
+  const circularColumns = useMemo(() => [
     { title: 'Circular Title', dataIndex: 'title', key: 'title', width: 450 },
     { title: 'Upload Date', dataIndex: 'uploadDate', key: 'uploadDate', sorter: (a: any, b: any) => a.uploadDate.localeCompare(b.uploadDate) },
     {
@@ -1064,9 +1109,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         </Popconfirm>
       )
     }] : [])
-  ];
+  ], [isAuthenticated]);
 
-  const getFormColumns = () => [
+  const formColumns = useMemo(() => [
     { title: 'Form Title', dataIndex: 'title', key: 'title', width: 450 },
     { title: 'Upload Date', dataIndex: 'uploadDate', key: 'uploadDate', sorter: (a: any, b: any) => a.uploadDate.localeCompare(b.uploadDate) },
     {
@@ -1091,17 +1136,59 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         </Popconfirm>
       )
     }] : [])
-  ];
+  ], [isAuthenticated]);
 
-  // Generic Search Filter
-  const filterDataset = (data: any[]) => {
+  // Generic Search Filter (memoized against its two real inputs)
+  const filterDataset = useCallback((data: any[]) => {
     if (!searchText) return data;
+    const needle = searchText.toLowerCase();
     return data.filter(item => 
       Object.values(item).some(val => 
-        val && val.toString().toLowerCase().includes(searchText.toLowerCase())
+        val && val.toString().toLowerCase().includes(needle)
       )
     );
-  };
+  }, [searchText]);
+
+  /** Reusable "Search + Add new record" header bar used by every CRUD listing.
+   *  Stacks vertically on mobile, sits inline on tablet/desktop. */
+  const ListHeader = ({
+    titleNode,
+    onAdd,
+    addLabel = 'Add New Record',
+    extra,
+  }: {
+    titleNode: React.ReactNode;
+    onAdd?: () => void;
+    addLabel?: string;
+    extra?: React.ReactNode;
+  }) => (
+    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 py-1 w-full">
+      <div className="flex items-center gap-4 flex-wrap">{titleNode}</div>
+      <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
+        {extra}
+        <Input
+          placeholder="Search resources..."
+          prefix={<SearchOutlined className="text-slate-400" />}
+          value={searchTextRaw}
+          onChange={(e) => setSearchTextRaw(e.target.value)}
+          allowClear
+          style={{ width: searchInputWidth }}
+          className="rounded-lg text-xs"
+        />
+        {onAdd && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            block={isMobile}
+            className="rounded-lg text-xs font-semibold"
+            onClick={onAdd}
+          >
+            {addLabel}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   // ==========================================
   // VIEW RENDERER DISPATCHER
@@ -1202,7 +1289,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
     if (currentKey === 'public-salary-portal') {
       return (
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm">
+        <div className="bg-white dark:bg-zinc-900 p-4 sm:p-6 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm">
           <SalaryPortalView />
         </div>
       );
@@ -1244,12 +1331,12 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider mb-2">
                         1. Registration & Ledger Additions
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
                         <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-blue-600 hover:bg-blue-500 border-0" onClick={() => { setEditRecord(null); setActiveModal('scientist'); }}>New Scientist</Button>
                         <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-500 border-0" onClick={() => { setEditRecord(null); setActiveModal('project'); }}>New Project</Button>
                         <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-purple-600 hover:bg-purple-500 border-0" onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}>Project Staff</Button>
                         <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-sky-600 hover:bg-sky-500 border-0" onClick={() => { setEditRecord(null); setActiveModal('perm'); }}>Permanent Staff</Button>
-                        <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-500 border-0 col-span-2" onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}>YP & Consultant Staff</Button>
+                        <Button type="primary" size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold bg-emerald-600 hover:bg-emerald-500 border-0 col-span-1 xs:col-span-2" onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}>YP & Consultant Staff</Button>
                       </div>
                     </div>
 
@@ -1259,7 +1346,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider mb-2">
                         2. Broadcasts & Library Uploads
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
                         <Button size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold border-slate-200 dark:border-zinc-800" onClick={() => { setEditRecord(null); setActiveModal('circular'); }}>Circular Doc</Button>
                         <Button size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold border-slate-200 dark:border-zinc-800" onClick={() => { setEditRecord(null); setActiveModal('form'); }}>Form Template</Button>
                         <Button size="small" icon={<PlusOutlined />} className="text-[10px] h-8 rounded-lg font-bold border-slate-200 dark:border-zinc-800" onClick={() => { setEditRecord(null); setActiveModal('announcement'); }}>Ticker News</Button>
@@ -1285,19 +1372,19 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                         Option 1: Complete Separate Registries (All Fields)
                       </div>
                       <Row gutter={[8, 8]}>
-                        <Col span={12}>
+                        <Col xs={24} sm={12}>
                           <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportScientistsCSV}>Scientists</Button>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} sm={12}>
                           <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportPermanentStaffCSV}>Permanent Staff</Button>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} sm={12}>
                           <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportProjectStaffCSV}>Project Staff</Button>
                         </Col>
-                        <Col span={12}>
+                        <Col xs={24} sm={12}>
                           <Button size="small" block className="text-[10px] rounded-lg text-slate-700 dark:text-zinc-300 font-bold" icon={<DownloadOutlined />} onClick={exportYPConsultantCSV}>YP & Consultants</Button>
                         </Col>
-                        <Col span={24}>
+                        <Col xs={24}>
                           <Button size="small" block className="text-[10px] rounded-lg text-emerald-700 dark:text-emerald-400 font-bold border-emerald-200 dark:border-emerald-950" icon={<DownloadOutlined />} onClick={exportProjectsCSV}>Project Details (UCs, Budget, PI)</Button>
                         </Col>
                       </Row>
@@ -1405,7 +1492,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     // Guard for Super Admin Accounts Management (Only admin-1 is allowed)
     if (currentKey === 'admin-accounts' && currentAdmin?.id !== 'admin-1') {
       return (
-        <div className="max-w-xl mx-auto my-12">
+        <div className="max-w-xl mx-auto my-12 px-4">
           <Card className="shadow-sm rounded-xl text-center py-12 border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
             <div className="text-red-500 text-5xl mb-4">⚠️</div>
             <h2 className="text-lg font-bold text-slate-800 dark:text-zinc-100 mb-2">Access Denied</h2>
@@ -1428,12 +1515,12 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
     if (currentKey === 'admin-scientists') {
       title = '🎓 Registered Scientists Registry';
-      columns = getScientistColumns();
+      columns = scientistColumns;
       dataSource = scientists;
       modalType = 'scientist';
     } else if (currentKey === 'admin-projects') {
       title = '🔬 Extramural Projects Ledger';
-      columns = getProjectColumns();
+      columns = projectColumns;
       dataSource = projects;
       modalType = 'project';
     } else if (currentKey === 'admin-project-staff') {
@@ -1461,7 +1548,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           title: 'Review Operations',
           key: 'operations',
           render: (_: any, rec: any) => (
-            <Space size="middle">
+            <Space size="middle" wrap>
               <Button 
                 type="primary" 
                 size="small" 
@@ -1506,53 +1593,35 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           variant="borderless"
           className="shadow-sm rounded-xl overflow-hidden"
           title={
-            <div className="flex justify-between items-center flex-wrap gap-4 py-1">
-              <div className="flex items-center gap-4 flex-wrap">
-                <span className="font-bold text-base text-slate-800 dark:text-zinc-100">👥 Project Research Staff Profiles</span>
-                <Radio.Group 
-                  value={activeProjectStaffTab} 
-                  onChange={(e) => setActiveProjectStaffTab(e.target.value)}
-                  size="small"
-                  className="rounded-lg"
-                >
-                  <Radio.Button value="ledger">Active Ledger ({projectStaff.length})</Radio.Button>
-                  <Radio.Button value="pending">
-                    Pending Approvals 
-                    {pendingProjectStaff.length > 0 && (
-                      <Badge count={pendingProjectStaff.length} className="ms-2" offset={[4, -2]} />
-                    )}
-                  </Radio.Button>
-                </Radio.Group>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Search resources..."
-                  prefix={<SearchOutlined className="text-slate-400" />}
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  allowClear
-                  style={{ width: 220 }}
-                  className="rounded-lg text-xs"
-                />
-                {activeProjectStaffTab === 'ledger' && (
-                  <Button 
-                    type="primary" 
-                    icon={<PlusOutlined />} 
-                    className="rounded-lg text-xs font-semibold"
-                    onClick={() => { setEditRecord(null); setActiveModal('pstaff'); }}
+            <ListHeader
+              titleNode={
+                <>
+                  <span className="font-bold text-base text-slate-800 dark:text-zinc-100">👥 Project Research Staff Profiles</span>
+                  <Radio.Group 
+                    value={activeProjectStaffTab} 
+                    onChange={(e) => setActiveProjectStaffTab(e.target.value)}
+                    size="small"
+                    className="rounded-lg"
                   >
-                    Add New Record
-                  </Button>
-                )}
-              </div>
-            </div>
+                    <Radio.Button value="ledger">Active Ledger ({projectStaff.length})</Radio.Button>
+                    <Radio.Button value="pending">
+                      Pending Approvals 
+                      {pendingProjectStaff.length > 0 && (
+                        <Badge count={pendingProjectStaff.length} className="ms-2" offset={[4, -2]} />
+                      )}
+                    </Radio.Button>
+                  </Radio.Group>
+                </>
+              }
+              onAdd={activeProjectStaffTab === 'ledger' ? () => { setEditRecord(null); setActiveModal('pstaff'); } : undefined}
+            />
           }
         >
           {activeProjectStaffTab === 'ledger' ? (
             <Table 
-              columns={getProjectStaffColumns()} 
+              columns={projectStaffColumns} 
               dataSource={filteredActive} 
-              pagination={{ pageSize: 10 }}
+              pagination={{ pageSize: 10, responsive: true }}
               size="middle"
               rowKey="id"
               scroll={{ x: 'max-content' }}
@@ -1568,7 +1637,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <Table 
               columns={pendingColumns} 
               dataSource={filteredPending} 
-              pagination={{ pageSize: 10 }}
+              pagination={{ pageSize: 10, responsive: true }}
               size="middle"
               rowKey="id"
               scroll={{ x: 'max-content' }}
@@ -1585,26 +1654,26 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       );
     } else if (currentKey === 'admin-permanent-staff') {
       title = '💼 Permanent Staff Registry';
-      columns = getPermanentStaffColumns();
+      columns = permanentStaffColumns;
       dataSource = permanentStaff;
       modalType = 'perm';
     } else if (currentKey === 'admin-yp-consultants') {
       title = '🌟 Young Professionals & Consultants';
-      columns = getYPConsultantColumns();
+      columns = ypConsultantColumns;
       dataSource = ypConsultants;
       modalType = 'ypc';
     } else if (currentKey === 'admin-circulars') {
       title = '📄 Institutional Office Circulars';
-      columns = getCircularColumns();
+      columns = circularColumns;
       dataSource = circulars;
       modalType = 'circular';
     } else if (currentKey === 'admin-forms') {
       title = '📝 Office Forms & Templates';
-      columns = getFormColumns();
+      columns = formColumns;
       dataSource = forms;
       modalType = 'form';
     } else if (currentKey === 'admin-events') {
-      title = 'Today’s Scientific Events Schedules';
+      title = '📅 Today’s Scientific Events Schedules';
       columns = [
         { title: 'Event Title', dataIndex: 'title', key: 'title', width: 350 },
         { title: 'Date', dataIndex: 'date', key: 'date', render: (val: string) => val ? new Date(val).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Today' },
@@ -1654,28 +1723,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     return (
       <Card 
         title={
-          <div className="flex justify-between items-center flex-wrap gap-2 py-1">
-            <span className="font-bold text-base text-slate-800 dark:text-zinc-100">{title}</span>
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Search resources..."
-                prefix={<SearchOutlined className="text-slate-400" />}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-                style={{ width: 220 }}
-                className="rounded-lg text-xs"
-              />
-              <Button 
-                type="primary" 
-                icon={<PlusOutlined />} 
-                className="rounded-lg text-xs font-semibold"
-                onClick={() => { setEditRecord(null); setActiveModal(modalType); }}
-              >
-                Add New Record
-              </Button>
-            </div>
-          </div>
+          <ListHeader
+            titleNode={<span className="font-bold text-base text-slate-800 dark:text-zinc-100">{title}</span>}
+            onAdd={() => { setEditRecord(null); setActiveModal(modalType); }}
+          />
         }
         variant="borderless"
         className="shadow-sm rounded-xl overflow-hidden"
@@ -1683,7 +1734,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         <Table 
           columns={columns} 
           dataSource={filterDataset(dataSource)} 
-          pagination={{ pageSize: 10 }}
+          pagination={{ pageSize: 10, responsive: true }}
           size="middle"
           rowKey="id"
           scroll={{ x: 'max-content' }}
@@ -1740,13 +1791,13 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         {/* Core Layout Grid */}
         <Layout>
           {/* Centered Main Area */}
-          <Layout className="p-4 md:p-6 overflow-x-hidden bg-[#F8FAFC] dark:bg-zinc-950">
+          <Layout className="p-3 sm:p-4 md:p-6 overflow-x-hidden bg-[#F8FAFC] dark:bg-zinc-950">
             <Content className="w-full min-h-[500px]">
               {renderContentView()}
             </Content>
             
-            <Footer className="bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800 px-6 py-3 flex flex-col md:flex-row items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 font-medium tracking-tight mt-8 rounded-lg shadow-sm">
-              <div className="flex items-center gap-4 mb-2 md:mb-0">
+            <Footer className="bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800 px-4 sm:px-6 py-3 flex flex-col md:flex-row items-center justify-center md:justify-between gap-2 text-center text-[10px] text-slate-400 dark:text-zinc-500 font-medium tracking-tight mt-8 rounded-lg shadow-sm">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                 <span>System v1.4.2</span>
                 <span>Environment: Production</span>
                 <span>Last Data Sync: {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
@@ -1764,6 +1815,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           onCancel={() => setShowLoginModal(false)}
           okText="Authenticate & Login"
           confirmLoading={submittingLogin}
+          width={modalWidth(420)}
           className="rounded-xl overflow-hidden"
         >
           <div className="space-y-4 pt-2">
@@ -1790,7 +1842,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             {/* Math CAPTCHA verification */}
             <div className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-200 dark:border-zinc-800">
               <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block mb-2">🛡️ Human Verification (Shield Engine)</span>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <span className="text-base font-extrabold text-blue-700 tracking-wide select-none">{captchaQuestion}</span>
                 <Button size="small" type="dashed" className="text-xs" onClick={loadCaptcha}>Refresh CAPTCHA</Button>
               </div>
@@ -1810,7 +1862,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           open={activeModal !== null}
           footer={null}
           onCancel={() => { setActiveModal(null); setEditRecord(null); }}
-          width={800}
+          width={modalWidth(800)}
           destroyOnHidden
           className="rounded-xl"
         >
@@ -1879,9 +1931,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     </Col>
                   </Row>
                   <Divider className="my-2" />
-                  <div className="flex justify-end gap-2">
-                    <Button onClick={() => setActiveModal(null)}>Cancel</Button>
-                    <Button type="primary" htmlType="submit" loading={isSubmitting}>Save Admin</Button>
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
+                    <Button block={isMobile} onClick={() => setActiveModal(null)}>Cancel</Button>
+                    <Button block={isMobile} type="primary" htmlType="submit" loading={isSubmitting}>Save Admin</Button>
                   </div>
                 </Form>
               )}
@@ -1914,9 +1966,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     {values.fileName && <div className="text-xs text-green-600 mt-2 font-bold">✔️ Loaded: {values.fileName}</div>}
                   </div>
                   <Divider className="my-2" />
-                  <div className="flex justify-end gap-2">
-                    <Button onClick={() => setActiveModal(null)}>Cancel</Button>
-                    <Button type="primary" htmlType="submit" loading={isSubmitting}>Save Circular</Button>
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
+                    <Button block={isMobile} onClick={() => setActiveModal(null)}>Cancel</Button>
+                    <Button block={isMobile} type="primary" htmlType="submit" loading={isSubmitting}>Save Circular</Button>
                   </div>
                 </Form>
               )}
@@ -1948,9 +2000,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     {values.fileName && <div className="text-xs text-green-600 mt-2 font-bold">✔️ Loaded: {values.fileName}</div>}
                   </div>
                   <Divider className="my-2" />
-                  <div className="flex justify-end gap-2">
-                    <Button onClick={() => setActiveModal(null)}>Cancel</Button>
-                    <Button type="primary" htmlType="submit" loading={isSubmitting}>Save Form Template</Button>
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
+                    <Button block={isMobile} onClick={() => setActiveModal(null)}>Cancel</Button>
+                    <Button block={isMobile} type="primary" htmlType="submit" loading={isSubmitting}>Save Form Template</Button>
                   </div>
                 </Form>
               )}
@@ -1969,9 +2021,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     <Field as={Input.TextArea} rows={3} name="title" required placeholder="Type the announcement bulletin details..." />
                   </div>
                   <Divider className="my-2" />
-                  <div className="flex justify-end gap-2">
-                    <Button onClick={() => setActiveModal(null)}>Cancel</Button>
-                    <Button type="primary" htmlType="submit" loading={isSubmitting}>Publish Announcement</Button>
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
+                    <Button block={isMobile} onClick={() => setActiveModal(null)}>Cancel</Button>
+                    <Button block={isMobile} type="primary" htmlType="submit" loading={isSubmitting}>Publish Announcement</Button>
                   </div>
                 </Form>
               )}
@@ -2008,9 +2060,9 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     </Col>
                   </Row>
                   <Divider className="my-2" />
-                  <div className="flex justify-end gap-2">
-                    <Button onClick={() => setActiveModal(null)}>Cancel</Button>
-                    <Button type="primary" htmlType="submit" loading={isSubmitting}>Schedule Event</Button>
+                  <div className="flex flex-col sm:flex-row justify-end gap-2">
+                    <Button block={isMobile} onClick={() => setActiveModal(null)}>Cancel</Button>
+                    <Button block={isMobile} type="primary" htmlType="submit" loading={isSubmitting}>Schedule Event</Button>
                   </div>
                 </Form>
               )}
@@ -2039,11 +2091,11 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           open={viewDetailModalVisible}
           onCancel={() => setViewDetailModalVisible(false)}
           footer={[
-            <Button key="close" type="primary" onClick={() => setViewDetailModalVisible(false)}>
+            <Button key="close" type="primary" block={isMobile} onClick={() => setViewDetailModalVisible(false)}>
               Close Profile View
             </Button>
           ].filter(Boolean)}
-          width={700}
+          width={modalWidth(700)}
           className="rounded-xl overflow-hidden"
         >
           {viewDetailRecord && (
@@ -2054,7 +2106,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                   <img 
                     src={viewDetailRecord.photoUrl} 
                     alt={viewDetailRecord.name} 
-                    className="w-20 h-20 rounded-full object-cover border-2 border-blue-500 shadow-sm"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-blue-500 shadow-sm flex-shrink-0"
                     referrerPolicy="no-referrer"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(viewDetailRecord.name);
@@ -2064,12 +2116,12 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                   <Avatar 
                     size={80} 
                     src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(viewDetailRecord.name)}`}
-                    className="border-2 border-blue-500 shadow-sm"
+                    className="border-2 border-blue-500 shadow-sm flex-shrink-0"
                   />
                 )}
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-slate-800 dark:text-zinc-100 m-0">{viewDetailRecord.name}</h3>
-                  <p className="text-xs font-semibold text-blue-600 m-0">{viewDetailRecord.designation || viewDetailRecord.fullDesignation || 'Officer'}</p>
+                <div className="space-y-1 min-w-0">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-800 dark:text-zinc-100 m-0 truncate">{viewDetailRecord.name}</h3>
+                  <p className="text-xs font-semibold text-blue-600 m-0 truncate">{viewDetailRecord.designation || viewDetailRecord.fullDesignation || 'Officer'}</p>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Tag color="blue" className="m-0 text-[10px] uppercase font-bold">{viewDetailRecord.employeeCode || 'TEMP-CODE'}</Tag>
                     <Tag color={viewDetailRecord.status === 'Active' ? 'green' : 'red'} className="m-0 text-[10px] uppercase font-bold">
@@ -2128,7 +2180,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     {(isAuthenticated || !!visibility?.fields.email) && (
                       <Col xs={24} sm={12}>
                         <span className="block text-[10px] text-slate-400 font-medium">Primary Email</span>
-                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 break-all">
                           {renderMaskedField(viewDetailRecord.govtEmail || viewDetailRecord.email, true)}
                         </span>
                       </Col>
@@ -2136,7 +2188,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                     {viewDetailRecord.personalEmail && isAuthenticated && (
                       <Col xs={24} sm={12}>
                         <span className="block text-[10px] text-slate-400 font-medium">Personal Email</span>
-                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                        <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 break-all">
                           {renderMaskedField(viewDetailRecord.personalEmail, true)}
                         </span>
                       </Col>
@@ -2379,7 +2431,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                       const project = projects.find(p => p.id === viewDetailRecord.projectId);
                       const tenure = calculateIcmrTenureStatus(viewDetailRecord, project);
                       return (
-                        <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-100/50 dark:border-blue-900/30 mb-3 text-xs flex justify-between items-center">
+                        <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-100/50 dark:border-blue-900/30 mb-3 text-xs flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                           <span className="font-semibold text-blue-800 dark:text-blue-300">Cumulative Experience Month Totals (Total ICMR + Non-ICMR):</span>
                           <span className="font-bold text-blue-600 dark:text-blue-400 font-mono">
                             {tenure.cumulativeTotalMonths.toFixed(1)} Months ({formatYMD(tenure.cumulativeYMD)})
@@ -2396,7 +2448,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                           <div className="space-y-2">
                             {viewDetailRecord.previousIcmrExperience.map((exp: any, i: number) => (
                               <div key={exp.id || i} className="bg-slate-50/75 dark:bg-zinc-900/30 p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-xs">
-                                <div className="flex justify-between font-bold text-slate-700 dark:text-zinc-300">
+                                <div className="flex flex-col sm:flex-row sm:justify-between font-bold text-slate-700 dark:text-zinc-300 gap-0.5">
                                   <span>{exp.instituteName}</span>
                                   <span className="text-blue-600">{exp.designation}</span>
                                 </div>
@@ -2418,7 +2470,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                           <div className="space-y-2">
                             {viewDetailRecord.previousNonIcmrExperience.map((exp: any, i: number) => (
                               <div key={exp.id || i} className="bg-slate-50/75 dark:bg-zinc-900/30 p-2.5 rounded-lg border border-slate-100 dark:border-zinc-800/80 text-xs">
-                                <div className="flex justify-between font-bold text-slate-700 dark:text-zinc-300">
+                                <div className="flex flex-col sm:flex-row sm:justify-between font-bold text-slate-700 dark:text-zinc-300 gap-0.5">
                                   <span>{exp.instituteName}</span>
                                   <span className="text-blue-600">{exp.designation}</span>
                                 </div>
