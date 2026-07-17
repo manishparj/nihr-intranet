@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   Layout, Menu, Button, Card, Table, Modal, Input, Row, Col, Space, Badge, Radio, 
-  Switch, Tag, Spin, Popconfirm, Avatar, Divider, message, ConfigProvider, theme, Empty,
+  Switch, Tag, Spin, Popconfirm, Avatar, Divider, message, ConfigProvider, theme, Empty, Progress,
   App as AntdApp, Tabs, Breadcrumb, Pagination, Grid
 } from 'antd';
 import { 
@@ -33,8 +33,8 @@ import { PublicProjectsView } from './components/PublicProjectsView';
 import { PublicProjectStaffView } from './components/PublicProjectStaffView';
 import { PublicPermanentStaffView } from './components/PublicPermanentStaffView';
 import { PublicYPConsultantsView } from './components/PublicYPConsultantsView';
-import { calculateIcmrTenureStatus } from './utils/experience';
 import { OutsourcingPortal } from './components/OutsourcingPortal';
+import { calculateIcmrTenureStatus } from './utils/experience';
 
 const { Header, Content, Footer, Sider } = Layout;
 const { useBreakpoint } = Grid;
@@ -154,11 +154,13 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [pendingProjectStaff, setPendingProjectStaff] = useState<any[]>([]);
   const [activeProjectStaffTab, setActiveProjectStaffTab] = useState<string>('ledger');
+  const [pendingYPConsultants, setPendingYPConsultants] = useState<any[]>([]);
+  const [activeYPConsultantsTab, setActiveYPConsultantsTab] = useState<string>('ledger');
   const [visibility, setVisibility] = useState<VisibilityConfig | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
   // Global search filters
-  const [searchTextRaw, setSearchTextRaw] = useState('');
+  const [searchTextRaw, setSearchText] = useState('');
   const searchText = useDebouncedValue(searchTextRaw, 200);
 
   // Editing Modals state
@@ -167,14 +169,14 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
   // Scientist/Staff Details Modal state
   const [viewDetailRecord, setViewDetailRecord] = useState<any | null>(null);
-  const [viewDetailType, setViewDetailType] = useState<'scientist' | 'pstaff' | 'perm' | 'ypc' | null>(null);
+  const [viewDetailType, setViewDetailType] = useState<'scientist' | 'pstaff' | 'perm' | 'ypc' | 'project' | null>(null);
   const [viewDetailModalVisible, setViewDetailModalVisible] = useState(false);
 
-  const openStaffDetailsModal = useCallback((record: any, type: 'scientist' | 'pstaff' | 'perm' | 'ypc') => {
+  const openStaffDetailsModal = (record: any, type: 'scientist' | 'pstaff' | 'perm' | 'ypc' | 'project') => {
     setViewDetailRecord(record);
     setViewDetailType(type);
     setViewDetailModalVisible(true);
-  }, []);
+  };
 
   // Responsive sizing helpers (single source of truth, used across all Modals/Inputs)
   const modalWidth = (desktopPx: number) => (isMobile ? '96%' : desktopPx);
@@ -600,12 +602,14 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
       // If authenticated, also fetch admins list and pending project staff registrations
       if (localStorage.getItem('nihr_token')) {
-        const [adminProfiles, pendingRegistrations] = await Promise.all([
+        const [adminProfiles, pendingRegistrations, pendingYpRegistrations] = await Promise.all([
           apiService.getAdmins(),
-          apiService.getPendingProjectStaff()
+          apiService.getPendingProjectStaff(),
+          apiService.getPendingYPConsultants()
         ]);
         setAdmins(adminProfiles);
         setPendingProjectStaff(pendingRegistrations);
+        setPendingYPConsultants(pendingYpRegistrations);
       }
     } catch (e) {
       console.error('Error loading data', e);
@@ -1112,6 +1116,26 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     }] : [])
   ], [isAuthenticated]);
 
+   const getYPConsultantColumns = () => [
+    { title: 'Temp/CONS Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
+    { title: 'Staff Member', dataIndex: 'name', key: 'name', font: 'bold' },
+    { title: 'Designation Type', dataIndex: 'designationType', key: 'designationType', render: (val: string) => <Tag color={val === 'Consultant' ? 'magenta' : 'cyan'}>{val}</Tag> },
+    { title: 'Full Designation', dataIndex: 'fullDesignation', key: 'fullDesignation' },
+    { title: 'Email', dataIndex: 'email', key: 'email', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') },
+    { title: 'Phone', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') },
+    { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> },
+    ...(isAuthenticated ? [{
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, rec: YPConsultant) => (
+        <Space size="middle">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('ypc'); }} />
+          <Popconfirm title="Delete profile?" onConfirm={() => handleDelete('ypc', rec.id)}><Button type="text" size="small" danger icon={<DeleteOutlined />} /></Popconfirm>
+        </Space>
+      )
+    }] : [])
+  ];
+
   const formColumns = useMemo(() => [
     { title: 'Form Title', dataIndex: 'title', key: 'title', width: 450 },
     { title: 'Upload Date', dataIndex: 'uploadDate', key: 'uploadDate', sorter: (a: any, b: any) => a.uploadDate.localeCompare(b.uploadDate) },
@@ -1171,7 +1195,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           placeholder="Search resources..."
           prefix={<SearchOutlined className="text-slate-400" />}
           value={searchTextRaw}
-          onChange={(e) => setSearchTextRaw(e.target.value)}
+          onChange={(e) => setSearchText(e.target.value)}
           allowClear
           style={{ width: searchInputWidth }}
           className="rounded-lg text-xs"
@@ -1668,10 +1692,151 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       dataSource = permanentStaff;
       modalType = 'perm';
     } else if (currentKey === 'admin-yp-consultants') {
-      title = '🌟 Young Professionals & Consultants';
-      columns = ypConsultantColumns;
-      dataSource = ypConsultants;
-      modalType = 'ypc';
+      const filteredActive = filterDataset(ypConsultants);
+      const filteredPending = pendingYPConsultants.filter(p => {
+        if (!searchText) return true;
+        const searchLower = searchText.toLowerCase();
+        return (p.name || '').toLowerCase().includes(searchLower) ||
+               (p.email || '').toLowerCase().includes(searchLower) ||
+               (p.phone || '').toLowerCase().includes(searchLower);
+      });
+
+      const pendingYpColumns = [
+        { title: 'Full Name', dataIndex: 'name', key: 'name', className: 'font-bold' },
+        { title: 'Designation Type', dataIndex: 'designationType', key: 'designationType', render: (val: string) => <Tag color={val === 'Consultant' ? 'magenta' : 'cyan'}>{val}</Tag> },
+        { title: 'Full Designation', dataIndex: 'fullDesignation', key: 'fullDesignation' },
+        { title: 'Official Email', dataIndex: 'email', key: 'email' },
+        { title: 'Phone Number', dataIndex: 'phone', key: 'phone' },
+        { title: 'Submission Date', dataIndex: 'id', key: 'submissionDate', render: (id: string) => {
+          const timestamp = parseInt(id.replace('pending-', ''), 10);
+          return isNaN(timestamp) ? 'Recent' : new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }},
+        {
+          title: 'Review Operations',
+          key: 'operations',
+          render: (_: any, rec: any) => (
+            <Space size="middle">
+              <Button 
+                type="primary" 
+                size="small" 
+                className="bg-green-600 hover:bg-green-700 font-semibold text-xs rounded-lg border-0"
+                onClick={async () => {
+                  try {
+                    await apiService.approvePendingYPConsultant(rec.id);
+                    message.success(`Approved successfully! ${rec.name} has been added to Active Ledger with employee code.`);
+                    fetchAllData();
+                  } catch (err) {
+                    message.error('Failed to approve registration.');
+                  }
+                }}
+              >
+                Approve & Allocate Code
+              </Button>
+              <Popconfirm 
+                title="Reject this registration application?" 
+                onConfirm={async () => {
+                  try {
+                    await apiService.rejectPendingYPConsultant(rec.id);
+                    message.success('Registration application rejected/cleared.');
+                    fetchAllData();
+                  } catch (err) {
+                    message.error('Failed to reject registration.');
+                  }
+                }}
+                okText="Yes, Reject"
+                cancelText="Cancel"
+              >
+                <Button type="primary" danger size="small" className="font-semibold text-xs rounded-lg">
+                  Reject
+                </Button>
+              </Popconfirm>
+            </Space>
+          )
+        }
+      ];
+
+      return (
+        <Card
+          variant="borderless"
+          className="shadow-sm rounded-xl overflow-hidden"
+          title={
+            <div className="flex justify-between items-center flex-wrap gap-4 py-1">
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="font-bold text-base text-slate-800 dark:text-zinc-100">🌟 Young Professionals & Consultants</span>
+                <Radio.Group 
+                  value={activeYPConsultantsTab} 
+                  onChange={(e) => setActiveYPConsultantsTab(e.target.value)}
+                  size="small"
+                  className="rounded-lg"
+                >
+                  <Radio.Button value="ledger">Active Ledger ({ypConsultants.length})</Radio.Button>
+                  <Radio.Button value="pending">
+                    Pending Approvals 
+                    {pendingYPConsultants.length > 0 && (
+                      <Badge count={pendingYPConsultants.length} className="ms-2" offset={[4, -2]} />
+                    )}
+                  </Radio.Button>
+                </Radio.Group>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Search resources..."
+                  prefix={<SearchOutlined className="text-slate-400" />}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                  style={{ width: 220 }}
+                  className="rounded-lg text-xs"
+                />
+                {activeYPConsultantsTab === 'ledger' && (
+                  <Button 
+                    type="primary" 
+                    icon={<PlusOutlined />} 
+                    className="rounded-lg text-xs font-semibold"
+                    onClick={() => { setEditRecord(null); setActiveModal('ypc'); }}
+                  >
+                    Add New Record
+                  </Button>
+                )}
+              </div>
+            </div>
+          }
+        >
+          {activeYPConsultantsTab === 'ledger' ? (
+            <Table 
+              columns={getYPConsultantColumns()} 
+              dataSource={filteredActive} 
+              pagination={{ pageSize: 10 }}
+              size="middle"
+              rowKey="id"
+              scroll={{ x: 'max-content' }}
+              onRow={(record) => ({
+                onClick: (e: any) => {
+                  if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
+                  openStaffDetailsModal(record, 'ypc');
+                },
+                className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
+              })}
+            />
+          ) : (
+            <Table 
+              columns={pendingYpColumns} 
+              dataSource={filteredPending} 
+              pagination={{ pageSize: 10 }}
+              size="middle"
+              rowKey="id"
+              scroll={{ x: 'max-content' }}
+              onRow={(record) => ({
+                onClick: (e: any) => {
+                  if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
+                  openStaffDetailsModal(record, 'ypc');
+                },
+                className: 'cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200'
+              })}
+            />
+          )}
+        </Card>
+      );
     } else if (currentKey === 'admin-circulars') {
       title = '📄 Institutional Office Circulars';
       columns = circularColumns;
@@ -1749,11 +1914,12 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           rowKey="id"
           scroll={{ x: 'max-content' }}
           onRow={(record) => {
-            let rowType: 'scientist' | 'pstaff' | 'perm' | 'ypc' | null = null;
+            let rowType: 'scientist' | 'pstaff' | 'perm' | 'ypc' | 'project' | null = null;
             if (currentKey === 'admin-scientists') rowType = 'scientist';
             else if (currentKey === 'admin-project-staff') rowType = 'pstaff';
             else if (currentKey === 'admin-permanent-staff') rowType = 'perm';
             else if (currentKey === 'admin-yp-consultants') rowType = 'ypc';
+            else if (currentKey === 'admin-projects') rowType = 'project';
 
             if (rowType) {
               return {
@@ -2108,7 +2274,209 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           width={modalWidth(700)}
           className="rounded-xl overflow-hidden"
         >
-          {viewDetailRecord && (
+          {viewDetailRecord && viewDetailType === 'project' ? (
+            <div className="space-y-6 py-4 max-h-[70vh] overflow-y-auto pr-1">
+              {/* Project Title Block */}
+              <div className="bg-slate-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-slate-100 dark:border-zinc-800">
+                <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest block">Project Administrative Specification</span>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-100 m-0 mt-1 flex flex-wrap items-center gap-2">
+                  📂 {viewDetailRecord.name}
+                </h3>
+                <div className="mt-2">
+                  <Tag color="blue" className="text-xs uppercase font-extrabold rounded-md m-0">{viewDetailRecord.shortName}</Tag>
+                </div>
+              </div>
+
+              {/* Specifications & Dates */}
+              <Row gutter={[16, 16]}>
+                <Col xs={24}>
+                  <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
+                    🔬 Funding and Timeline
+                  </h4>
+                  <Row gutter={[12, 12]}>
+                    <Col xs={12} sm={8}>
+                      <span className="block text-[10px] text-slate-400 font-medium">Funding Scheme</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.type} Scheme</span>
+                    </Col>
+                    <Col xs={12} sm={8}>
+                      <span className="block text-[10px] text-slate-400 font-medium">Financial Outlay</span>
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">₹{(viewDetailRecord.budget || 0).toLocaleString('en-IN')}</span>
+                    </Col>
+                    <Col xs={12} sm={8}>
+                      <span className="block text-[10px] text-slate-400 font-medium">Status</span>
+                      <Tag color={viewDetailRecord.status === 'Completed' ? 'green' : viewDetailRecord.status === 'Ongoing' ? 'blue' : 'gray'}>
+                        {viewDetailRecord.status}
+                      </Tag>
+                    </Col>
+                    <Col xs={12} sm={8}>
+                      <span className="block text-[10px] text-slate-400 font-medium">Commencement Date</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.startDate}</span>
+                    </Col>
+                    <Col xs={12} sm={8}>
+                      <span className="block text-[10px] text-slate-400 font-medium">Scheduled End Date</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">{viewDetailRecord.endDate}</span>
+                    </Col>
+                    <Col xs={12} sm={8}>
+                      <span className="block text-[10px] text-slate-400 font-medium">Principal Investigator</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                        {scientists.find((s: any) => s.id === viewDetailRecord.piId)?.name || 'Dr. ' + viewDetailRecord.piId}
+                      </span>
+                    </Col>
+                  </Row>
+                </Col>
+
+                {/* Progress / Timeline completion */}
+                <Col xs={24}>
+                  <div className="p-4 bg-slate-50/50 dark:bg-zinc-950/40 rounded-xl border border-slate-100 dark:border-zinc-900/60">
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Project Lifecycle Completion</span>
+                      <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                        {viewDetailRecord.pendingDays && viewDetailRecord.durationDays ? (
+                          `${Math.max(0, Math.round(((viewDetailRecord.durationDays - viewDetailRecord.pendingDays) / viewDetailRecord.durationDays) * 100))}%`
+                        ) : '0%'}
+                      </span>
+                    </div>
+                    {viewDetailRecord.pendingDays && viewDetailRecord.durationDays ? (
+                      <Progress 
+                        percent={Math.max(0, Math.min(100, Math.round(((viewDetailRecord.durationDays - viewDetailRecord.pendingDays) / viewDetailRecord.durationDays) * 100)))} 
+                        strokeColor={{ '0%': '#10B981', '100%': '#3B82F6' }}
+                        showInfo={false}
+                        className="m-0"
+                      />
+                    ) : <Progress percent={0} showInfo={false} />}
+                    <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400">
+                      <span>Started: {viewDetailRecord.startDate}</span>
+                      <span>{viewDetailRecord.pendingDays || 0} days remaining</span>
+                    </div>
+                  </div>
+                </Col>
+
+                {/* Utilization Certificates */}
+                <Col xs={24}>
+                  <Card 
+                    size="small" 
+                    title={<span className="text-xs font-black text-slate-800 dark:text-zinc-200">📋 Official Project Utilization Certificates (UCs)</span>}
+                    variant="borderless"
+                    className="bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-100 dark:border-zinc-900"
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-extrabold uppercase block mb-1">Provisional Utilization Certificates</span>
+                        {viewDetailRecord.provisionalUCs && viewDetailRecord.provisionalUCs.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {viewDetailRecord.provisionalUCs.map((uc: any, idx: number) => (
+                              <div key={uc.id || idx} className="flex items-center justify-between p-2 bg-white dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800 text-xs">
+                                <span className="font-bold text-slate-700 dark:text-zinc-300 truncate max-w-[130px]" title={uc.period}>📅 {uc.period}</span>
+                                <Button 
+                                  type="primary" 
+                                  size="small" 
+                                  icon={<DownloadOutlined />} 
+                                  className="text-[10px] h-6 px-2.5 rounded-md font-extrabold border-0 bg-blue-600 hover:bg-blue-500"
+                                  onClick={() => handleDownloadBase64File(uc.fileName, uc.fileData)}
+                                >
+                                  Download PDF
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-zinc-500 italic block">No Provisional UCs uploaded yet</span>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100 dark:border-zinc-900">
+                        <span className="text-[10px] text-slate-400 font-extrabold uppercase block mb-1">Final Audited Utilization Certificate</span>
+                        {viewDetailRecord.finalUC ? (
+                          <div className="flex items-center justify-between p-2.5 bg-amber-50/50 dark:bg-amber-950/10 rounded-lg border border-amber-100/50 dark:border-amber-950/40 text-xs">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800 dark:text-zinc-200">Period: {viewDetailRecord.finalUC.period}</span>
+                              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono truncate max-w-[180px]">{viewDetailRecord.finalUC.fileName}</span>
+                            </div>
+                            <Button 
+                              type="primary" 
+                              size="small" 
+                              icon={<DownloadOutlined />} 
+                              className="text-[10px] h-7 px-3 rounded-md font-extrabold border-0 bg-amber-600 hover:bg-amber-500"
+                              onClick={() => handleDownloadBase64File(viewDetailRecord.finalUC?.fileName || 'final_uc.pdf', viewDetailRecord.finalUC?.fileData || '')}
+                            >
+                              Download Final UC
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-zinc-500 italic block">Final UC has not been uploaded by the PI yet</span>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                </Col>
+
+                {/* Final Report */}
+                <Col xs={24}>
+                  <Card 
+                    size="small" 
+                    title={<span className="text-xs font-black text-slate-800 dark:text-zinc-200">🏆 Final Project Report Document</span>}
+                    variant="borderless"
+                    className="bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-100 dark:border-zinc-900"
+                  >
+                    {viewDetailRecord.finalReport ? (
+                      <div className="flex items-center justify-between p-3 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-lg border border-emerald-100/50 dark:border-emerald-950/40 text-xs">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 rounded-lg flex items-center justify-center">
+                            <FilePdfOutlined className="text-lg" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-extrabold text-slate-800 dark:text-zinc-200 truncate max-w-[200px]" title={viewDetailRecord.finalReport.title}>
+                              {viewDetailRecord.finalReport.title || 'Final Scientific Report'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono truncate max-w-[150px]">{viewDetailRecord.finalReport.fileName}</span>
+                          </div>
+                        </div>
+                        <Button 
+                          type="primary" 
+                          size="small" 
+                          icon={<DownloadOutlined />} 
+                          className="text-[10px] h-8 px-3.5 rounded-lg font-extrabold border-0 bg-emerald-600 hover:bg-emerald-500"
+                          onClick={() => handleDownloadBase64File(viewDetailRecord.finalReport?.fileName || 'final_report.pdf', viewDetailRecord.finalReport?.fileData || '')}
+                        >
+                          Download Report
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 bg-white dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800">
+                        <span className="text-xs text-slate-400 dark:text-zinc-500 italic block">No Final Project Report uploaded</span>
+                      </div>
+                    )}
+                  </Card>
+                </Col>
+
+                {/* Associated Project Staff */}
+                <Col xs={24}>
+                  <div className="pt-2">
+                    <h4 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2 border-b border-slate-100 dark:border-zinc-800 pb-1">
+                      👥 Associated Project Staff ({(projectStaff || []).filter((ps: any) => ps.projectId === viewDetailRecord.id).length})
+                    </h4>
+                    {(projectStaff || []).filter((ps: any) => ps.projectId === viewDetailRecord.id).length > 0 ? (
+                      <Table
+                        size="small"
+                        pagination={{ pageSize: 5 }}
+                        dataSource={(projectStaff || []).filter((ps: any) => ps.projectId === viewDetailRecord.id)}
+                        rowKey="id"
+                        scroll={{ x: 'max-content' }}
+                        columns={[
+                          { title: 'Employee Code', dataIndex: 'employeeCode', key: 'employeeCode', className: 'font-mono text-xs font-bold text-indigo-600' },
+                          { title: 'Name', dataIndex: 'name', key: 'name', className: 'font-bold' },
+                          { title: 'Designation', dataIndex: 'designation', key: 'designation' },
+                          { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={s === 'Active' ? 'green' : 'red'}>{s}</Tag> }
+                        ]}
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-zinc-500 italic">No project staff currently assigned to this project</span>
+                    )}
+                  </div>
+                </Col>
+              </Row>
+            </div>
+          ) : viewDetailRecord && (
             <div className="space-y-6 py-4 max-h-[70vh] overflow-y-auto pr-1">
               {/* Profile Header Block */}
               <div className="flex items-center gap-4 bg-slate-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-slate-100 dark:border-zinc-800">

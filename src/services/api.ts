@@ -394,5 +394,23 @@ export const apiService = {
   deleteOutsourcedEmployee: async (id: string) => {
     const res = await client.delete(`/outsourced-employees/${id}`);
     return res.data;
-  }
+  },
+
+   // Pending YP & Consultants Self-Registration
+  getPendingYPConsultants: async () => {
+    const res = await client.get<any[]>('/pending-yp-consultants');
+    return res.data;
+  },
+  submitPendingYPConsultant: async (data: any) => {
+    const res = await client.post<any>('/pending-yp-consultants', data);
+    return res.data;
+  },
+  approvePendingYPConsultant: async (id: string) => {
+    const res = await client.post<{ success: boolean; approvedRecord: any }>(`/pending-yp-consultants/${id}/approve`);
+    return res.data;
+  },
+  rejectPendingYPConsultant: async (id: string) => {
+    const res = await client.post<{ success: boolean }>(`/pending-yp-consultants/${id}/reject`);
+    return res.data;
+  },
 };

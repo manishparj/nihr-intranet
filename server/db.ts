@@ -294,6 +294,7 @@ export interface DatabaseSchema {
   visibility: VisibilityConfig;
   salaries: SalarySlip[];
   pendingProjectStaff: ProjectStaff[];
+  pendingYPConsultants: YPConsultant[];
   agencies: Agency[];
   outsourcedEmployees: OutsourcedEmployee[];
   storeSuperUsers: StoreSuperUser[];
@@ -616,6 +617,7 @@ const INITIAL_DATA: DatabaseSchema = {
   visibility: DEFAULT_VISIBILITY,
   salaries: [],
   pendingProjectStaff: [],
+  pendingYPConsultants: [],
   agencies: [
     {
       id: 'agency-1',
@@ -765,6 +767,7 @@ export class Database {
         if (!this.data.visibility) this.data.visibility = INITIAL_DATA.visibility;
         if (!this.data.salaries) this.data.salaries = [];
         if (!this.data.pendingProjectStaff) this.data.pendingProjectStaff = [];
+        if (!this.data.pendingYPConsultants) this.data.pendingYPConsultants = [];
         if (!this.data.agencies) this.data.agencies = INITIAL_DATA.agencies;
         if (!this.data.outsourcedEmployees) this.data.outsourcedEmployees = INITIAL_DATA.outsourcedEmployees;
         if (!this.data.storeSuperUsers) this.data.storeSuperUsers = INITIAL_DATA.storeSuperUsers;

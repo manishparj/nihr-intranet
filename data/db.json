@@ -179,6 +179,33 @@
       "leavingReason": "",
       "noDuesCleared": false,
       "id": "ypc-1784112178233"
+    },
+    {
+      "name": "cdsadcsd",
+      "dob": "2026-07-01",
+      "doj": "2026-07-15",
+      "fullDesignation": "sdsad",
+      "designationType": "Young Professional",
+      "email": "sfasfd@gmail.com",
+      "phone": "9896523569",
+      "gender": "Male",
+      "bloodGroup": "A+",
+      "employeeCode": "YP-1001",
+      "aadhaarNumber": "956987453321",
+      "panNumber": "CIXPP7445M",
+      "accountNumber": "96563214563",
+      "ifscCode": "DSFSADFAF",
+      "bankName": "SFSV DVS",
+      "departmentLocation": "DGGSG",
+      "roomNumber": "43",
+      "address": "DFGDSF",
+      "emergencyContact": "",
+      "category": "UR",
+      "status": "Active",
+      "lastWorkingDate": "",
+      "leavingReason": "",
+      "noDuesCleared": false,
+      "id": "ypc-1784284386681"
     }
   ],
   "circulars": [],
@@ -520,5 +547,6 @@
       "email": "storenihr@gmail.com",
       "passwordHash": "1a34c866f5d9aceb206cb656ecf41dd1e810fcc13f0d9b2904b4ec61b5023852"
     }
-  ]
+  ],
+  "pendingYPConsultants": []
 }
