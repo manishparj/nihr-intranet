@@ -2,7 +2,8 @@ import axios from 'axios';
 import { 
   Admin, Scientist, Project, ProjectStaff, PermanentStaff, 
   YPConsultant, Circular, FormDocument, Announcement, Event, 
-  BroadcastMessage, VisibilityConfig, SalarySlip
+  BroadcastMessage, VisibilityConfig, SalarySlip,
+  Agency, OutsourcedEmployee, StoreSuperUser
 } from '../types';
 
 const API_BASE_URL = '/api';
@@ -345,6 +346,53 @@ export const apiService = {
   // Security Backup
   getDatabaseBackup: async () => {
     const res = await client.get<any>('/backup');
+    return res.data;
+  },
+
+  // Store Super User Auth
+  loginStoreSuperUser: async (data: { email: string; password: string }) => {
+    const res = await client.post<{ token: string; storeUser: StoreSuperUser }>('/store/auth/login', data);
+    localStorage.setItem('nihr_token', res.data.token);
+    return res.data;
+  },
+  getStoreSuperUser: async () => {
+    const res = await client.get<{ storeUser: StoreSuperUser }>('/store/auth/me');
+    return res.data.storeUser;
+  },
+
+  // Agencies CRUD
+  getAgencies: async () => {
+    const res = await client.get<Agency[]>('/agencies');
+    return res.data;
+  },
+  createAgency: async (data: any) => {
+    const res = await client.post<Agency>('/agencies', data);
+    return res.data;
+  },
+  updateAgency: async (id: string, data: any) => {
+    const res = await client.put<Agency>(`/agencies/${id}`, data);
+    return res.data;
+  },
+  deleteAgency: async (id: string) => {
+    const res = await client.delete(`/agencies/${id}`);
+    return res.data;
+  },
+
+  // Outsourced Employees CRUD
+  getOutsourcedEmployees: async () => {
+    const res = await client.get<OutsourcedEmployee[]>('/outsourced-employees');
+    return res.data;
+  },
+  createOutsourcedEmployee: async (data: any) => {
+    const res = await client.post<OutsourcedEmployee>('/outsourced-employees', data);
+    return res.data;
+  },
+  updateOutsourcedEmployee: async (id: string, data: any) => {
+    const res = await client.put<OutsourcedEmployee>(`/outsourced-employees/${id}`, data);
+    return res.data;
+  },
+  deleteOutsourcedEmployee: async (id: string) => {
+    const res = await client.delete(`/outsourced-employees/${id}`);
     return res.data;
   }
 };

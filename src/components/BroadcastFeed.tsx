@@ -416,11 +416,11 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
                 className="bg-[#128C7E] text-white flex-shrink-0 flex items-center justify-center font-bold text-sm shadow-inner"
                 style={{ border: '2px solid #25D366' }}
               >
-                WA
+                NIHR
               </Avatar>
               <div className="min-w-0">
                 <div className="font-extrabold text-xs sm:text-sm text-white flex items-center gap-2 flex-wrap">
-                  🟢 URGENT BROADCAST BULLETIN CHANNEL
+                  🟢 ICMR-NIHR URGENT BROADCAST CHANNEL
                   <Tag color="#25D366" className="text-[9px] font-bold border-0 uppercase text-slate-900 animate-pulse m-0 px-1.5 py-0.5">PRIORITY</Tag>
                 </div>
                 <div className="text-[10px] text-emerald-100 flex items-center gap-1 mt-0.5">

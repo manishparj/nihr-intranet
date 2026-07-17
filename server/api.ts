@@ -17,7 +17,10 @@ import {
   BroadcastMessage, 
   VisibilityConfig,
   ExperienceEntry,
-  SalarySlip
+  SalarySlip,
+  Agency,
+  OutsourcedEmployee,
+  StoreSuperUser
 } from './db';
 import { ComplaintsDatabase } from './complaints_db';
 
@@ -1662,6 +1665,145 @@ router.put('/salaries/:id', authenticateAdmin, (req: Request, res: Response) => 
   salaries[index] = updatedSlip;
   Database.set('salaries', salaries);
   res.json({ success: true, salarySlip: updatedSlip });
+});
+
+// ==========================================
+// STORE SUPER USER & OUTSOURCING PORTAL ENDPOINTS
+// ==========================================
+
+// Store Super User Login
+router.post('/store/auth/login', (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+  const storeUsers = Database.get('storeSuperUsers') || [];
+  const user = storeUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid email or password.' });
+  }
+
+  // Support plain text 'admin' or hashed password match
+  const isDefaultStorePass = password === 'admin' && user.passwordHash === 'c7c2299886f3b060d40fae41846b412bf087b7a8dcb974fbf30cf611be247854';
+  const isHashedMatch = hashPassword(password) === user.passwordHash;
+
+  if (!isDefaultStorePass && !isHashedMatch) {
+    return res.status(401).json({ error: 'Invalid email or password.' });
+  }
+
+  const token = generateToken({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: 'store_super_user'
+  });
+
+  res.json({
+    token,
+    storeUser: {
+      id: user.id,
+      name: user.name,
+      email: user.email
+    }
+  });
+});
+
+// Helper middleware for Store & Admin
+function authenticateStoreOrAdmin(req: any, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Access denied. No token provided.' });
+  }
+  const token = authHeader.split(' ')[1];
+  const payload = verifyToken(token);
+  if (!payload) {
+    return res.status(401).json({ error: 'Invalid or expired token.' });
+  }
+  req.user = payload;
+  next();
+}
+
+// Get store current user
+router.get('/store/auth/me', authenticateStoreOrAdmin, (req: any, res: Response) => {
+  res.json({ storeUser: req.user });
+});
+
+// Agencies CRUD
+router.get('/agencies', (req: Request, res: Response) => {
+  const agencies = Database.get('agencies') || [];
+  res.json(agencies);
+});
+
+router.post('/agencies', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+  const data = req.body;
+  const agencies = Database.get('agencies') || [];
+  const newAgency = {
+    ...data,
+    id: `agency-${Date.now()}`
+  };
+  agencies.push(newAgency);
+  Database.set('agencies', agencies);
+  res.status(201).json(newAgency);
+});
+
+router.put('/agencies/:id', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const data = req.body;
+  const agencies = Database.get('agencies') || [];
+  const index = agencies.findIndex(a => a.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Agency not found.' });
+  }
+  agencies[index] = { ...agencies[index], ...data };
+  Database.set('agencies', agencies);
+  res.json(agencies[index]);
+});
+
+router.delete('/agencies/:id', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const agencies = Database.get('agencies') || [];
+  const filtered = agencies.filter(a => a.id !== id);
+  Database.set('agencies', filtered);
+  res.json({ success: true });
+});
+
+// Outsourced Employees CRUD
+router.get('/outsourced-employees', (req: Request, res: Response) => {
+  const employees = Database.get('outsourcedEmployees') || [];
+  res.json(employees);
+});
+
+router.post('/outsourced-employees', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+  const data = req.body;
+  const employees = Database.get('outsourcedEmployees') || [];
+  const newEmployee = {
+    ...data,
+    id: `oe-${Date.now()}`
+  };
+  employees.push(newEmployee);
+  Database.set('outsourcedEmployees', employees);
+  res.status(201).json(newEmployee);
+});
+
+router.put('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const data = req.body;
+  const employees = Database.get('outsourcedEmployees') || [];
+  const index = employees.findIndex(e => e.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Outsourced employee not found.' });
+  }
+  employees[index] = { ...employees[index], ...data };
+  Database.set('outsourcedEmployees', employees);
+  res.json(employees[index]);
+});
+
+router.delete('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const employees = Database.get('outsourcedEmployees') || [];
+  const filtered = employees.filter(e => e.id !== id);
+  Database.set('outsourcedEmployees', filtered);
+  res.json({ success: true });
 });
 
 export default router;

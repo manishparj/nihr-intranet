@@ -5,7 +5,7 @@ import {
   CustomerServiceOutlined, HomeOutlined, MenuOutlined, LoginOutlined, 
   LogoutOutlined, BulbOutlined, BulbFilled, AppstoreOutlined, 
   ProjectOutlined, SolutionOutlined, FilePdfOutlined, CalendarOutlined, 
-  SettingOutlined, KeyOutlined 
+  SettingOutlined, KeyOutlined, SafetyCertificateOutlined
 } from '@ant-design/icons';
 import { VisibilityConfig } from '../../types';
 
@@ -48,6 +48,7 @@ export function AppHeader({
       // ...(visibility?.modules.permanentStaff ? [{ key: 'public-permanent', icon: <TeamOutlined />, label: 'Permanent Staff' }] : []),
       ...(visibility?.modules.ypConsultants ? [{ key: 'public-ypc', icon: <StarOutlined />, label: 'YP & Consultants' }] : []),
       { key: 'public-salary-portal', icon: <PrinterOutlined />, label: 'Salary Portal' },
+      { key: 'outsourcing', icon: <SafetyCertificateOutlined />, label: 'Outsourced & Agencies' },
       { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Complaints Desk' }
     ];
   };
@@ -65,7 +66,8 @@ export function AppHeader({
           { key: 'admin-project-staff', icon: <SolutionOutlined />, label: 'Project Staff' },
           // { key: 'admin-permanent-staff', icon: <TeamOutlined />, label: 'Permanent Staff' },
           { key: 'admin-yp-consultants', icon: <StarOutlined />, label: 'YP & Consultants' },
-          { key: 'admin-salaries', icon: <PrinterOutlined />, label: 'Staff Salaries' }
+          { key: 'admin-salaries', icon: <PrinterOutlined />, label: 'Staff Salaries' },
+          { key: 'outsourcing', icon: <SafetyCertificateOutlined />, label: 'Outsourced & Agencies' }
         ]
       },
       {

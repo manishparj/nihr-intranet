@@ -29,6 +29,12 @@
       "name": "Section Offcier (Sunil Bishnoi)",
       "email": "sonihr@gmail.com",
       "passwordHash": "$2b$10$EPfG3vA9MAMv.uJ8qPqCqOlUoQ2S/m4Lz/ImsE58i7l3nB7mJly62"
+    },
+    {
+      "id": "admin-6",
+      "name": "Store Dept (Mukesh Panwar)",
+      "email": "storenihr@gmail.com",
+      "passwordHash": "$2b$10$EPfG3vA9MAMv.uJ8qPqCqOlUoQ2S/m4Lz/ImsE58i7l3nB7mJly62"
     }
   ],
   "scientists": [
@@ -62,11 +68,15 @@
       "type": "Extramural",
       "status": "Ongoing",
       "startDate": "2022-07-01",
-      "endDate": "2026-09-30",
+      "endDate": "2027-02-25",
       "budget": 1000000,
       "piId": "sci-1784111617006",
       "provisionalUCs": [],
-      "finalUC": null
+      "finalUC": null,
+      "finalReport": null,
+      "durationDays": 1491,
+      "pendingDays": 15,
+      "staffCount": 1
     }
   ],
   "projectStaff": [
@@ -108,9 +118,9 @@
       "spouseName": "",
       "spousePhone": "",
       "id": "pstaff-1784111965698",
-      "icmrExpMonths": 0,
+      "icmrExpMonths": 92,
       "nonIcmrExpMonths": 0,
-      "totalExpMonths": 0
+      "totalExpMonths": 92
     }
   ],
   "permanentStaff": [
@@ -186,9 +196,9 @@
   ],
   "broadcasts": [
     {
-      "id": "bc-1784115820623",
-      "text": "Meeting 14.052.",
-      "timestamp": "2026-07-15T11:43:40.623Z",
+      "id": "bc-1784265342999",
+      "text": "Hi",
+      "timestamp": "2026-07-17T05:15:42.999Z",
       "senderName": "IT Cell (Manish Prajapati)"
     }
   ],
@@ -414,5 +424,101 @@
       }
     }
   ],
-  "pendingProjectStaff": []
+  "pendingProjectStaff": [],
+  "agencies": [
+    {
+      "id": "agency-1",
+      "agencyName": "Security & Manpower Solutions Pvt Ltd",
+      "agreementNo": "SMS/ICMR/2026/04",
+      "dateOfAgreement": "2026-01-10",
+      "contractStartDate": "2026-01-15",
+      "contractEndDate": "2027-01-14",
+      "contractDuration": "12 Months",
+      "contractValue": 1500000,
+      "approvedManpower": 10,
+      "contactPerson": "Mr. Rajesh Kumar",
+      "mobileNo": "9876543210",
+      "emailId": "rajesh@smssolutions.com",
+      "agencyAddress": "Sector 62, Noida, UP, India",
+      "performanceSecurityValidity": "2027-03-14",
+      "status": "Active"
+    },
+    {
+      "id": "agency-2",
+      "agencyName": "Apex Outsourcing Services",
+      "agreementNo": "AOS/ICMR/2025/11",
+      "dateOfAgreement": "2025-11-01",
+      "contractStartDate": "2025-11-05",
+      "contractEndDate": "2026-11-04",
+      "contractDuration": "12 Months",
+      "contractValue": 2400000,
+      "approvedManpower": 15,
+      "contactPerson": "Ms. Priya Sharma",
+      "mobileNo": "9812345678",
+      "emailId": "priya@apexoutsourcing.com",
+      "agencyAddress": "Connaught Place, New Delhi, India",
+      "performanceSecurityValidity": "2027-01-04",
+      "status": "Active"
+    }
+  ],
+  "outsourcedEmployees": [
+    {
+      "id": "oe-1",
+      "employeeId": "OUT-1001",
+      "employeeName": "Anil Yadav",
+      "designation": "Multi Tasking Staff (MTS)",
+      "agencyId": "agency-1",
+      "agencyName": "Security & Manpower Solutions Pvt Ltd",
+      "departmentSectionLocation": "Administration",
+      "reportingOfficer": "Dr. Sunita Sharma",
+      "previousIcmrExperience": [],
+      "previousNonIcmrExperience": [],
+      "doj": "2026-02-01",
+      "doc": "2027-01-14",
+      "epfNo": "EPF/100293/92",
+      "esicNo": "ESIC/993041/44",
+      "aadhaarNo": "123456789012",
+      "panNo": "ABCDE1234F",
+      "mobileNo": "9988776655",
+      "emailId": "anil.yadav@example.com",
+      "status": "Active"
+    },
+    {
+      "id": "oe-2",
+      "employeeId": "OUT-1002",
+      "employeeName": "Geeta Devi",
+      "designation": "Data Entry Operator (DEO)",
+      "agencyId": "agency-2",
+      "agencyName": "Apex Outsourcing Services",
+      "departmentSectionLocation": "Finance & Accounts",
+      "reportingOfficer": "Mr. Rajesh Varma",
+      "previousIcmrExperience": [
+        {
+          "id": "prev-1",
+          "instituteName": "NIV Pune",
+          "designation": "DEO",
+          "fromDate": "2024-01-01",
+          "toDate": "2024-12-31"
+        }
+      ],
+      "previousNonIcmrExperience": [],
+      "doj": "2025-11-05",
+      "doc": "2026-11-04",
+      "epfNo": "EPF/998273/11",
+      "esicNo": "ESIC/221394/09",
+      "aadhaarNo": "987654321098",
+      "panNo": "XYZAB5678D",
+      "mobileNo": "9876543222",
+      "emailId": "geeta.deo@example.com",
+      "status": "Active"
+    }
+  ],
+  "storeSuperUsers": [
+    {
+      "id": "ssu-1",
+      "name": "Store Dept (Mukesh Panwar)",
+      "email": "storenihr@gmail.com",
+      "passwordHash": "c7c2299886f3b060d40fae41846b412bf087b7a8dcb974fbf30cf611be247854"
+    }
+  ]
 }

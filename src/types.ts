@@ -268,3 +268,49 @@ export interface SalarySlip {
   uploadedAt: string;
   details: Record<string, string>;
 }
+
+export interface Agency {
+  id: string;
+  agencyName: string;
+  agreementNo: string;
+  dateOfAgreement: string;
+  contractStartDate: string;
+  contractEndDate: string;
+  contractDuration: string;
+  contractValue: number;
+  approvedManpower: number;
+  contactPerson: string;
+  mobileNo: string;
+  emailId: string;
+  agencyAddress: string;
+  performanceSecurityValidity: string;
+  status: 'Active' | 'Inactive' | 'Terminated' | 'Expired';
+}
+
+export interface OutsourcedEmployee {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  designation: string;
+  agencyId: string;
+  agencyName: string;
+  departmentSectionLocation: string;
+  reportingOfficer: string;
+  previousIcmrExperience: ExperienceEntry[];
+  previousNonIcmrExperience: ExperienceEntry[];
+  doj: string;
+  doc: string;
+  epfNo: string;
+  esicNo: string;
+  aadhaarNo: string;
+  panNo: string;
+  mobileNo: string;
+  emailId: string;
+  status: 'Active' | 'Left';
+}
+
+export interface StoreSuperUser {
+  id: string;
+  name: string;
+  email: string;
+}

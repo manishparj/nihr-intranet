@@ -34,6 +34,7 @@ import { PublicProjectStaffView } from './components/PublicProjectStaffView';
 import { PublicPermanentStaffView } from './components/PublicPermanentStaffView';
 import { PublicYPConsultantsView } from './components/PublicYPConsultantsView';
 import { calculateIcmrTenureStatus } from './utils/experience';
+import { OutsourcingPortal } from './components/OutsourcingPortal';
 
 const { Header, Content, Footer, Sider } = Layout;
 const { useBreakpoint } = Grid;
@@ -1206,6 +1207,15 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       return <ComplaintPortal />;
     }
 
+     if (currentKey === 'outsourcing') {
+      return (
+        <OutsourcingPortal 
+          currentAdmin={currentAdmin} 
+          isAuthenticated={isAuthenticated} 
+        />
+      );
+    }
+
     // A. Public Dashboard Views
     if (currentKey === 'public-dashboard') {
       return (
@@ -1822,7 +1832,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <div>
               <label className="text-xs font-semibold text-slate-600 block mb-1">Official Email Address</label>
               <Input 
-                placeholder="icmrdigicare@gmail.com" 
+                placeholder="Enter Email" 
                 value={loginEmail} 
                 onChange={(e) => setLoginEmail(e.target.value)}
                 className="rounded-md"
