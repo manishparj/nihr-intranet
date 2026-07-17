@@ -36,12 +36,15 @@ export function PublicScientistsView({
     { title: 'Code', dataIndex: 'employeeCode', key: 'employeeCode', sorter: (a: any, b: any) => a.employeeCode.localeCompare(b.employeeCode) },
     { title: 'Scientist Name', dataIndex: 'name', key: 'name', className: 'font-bold', sorter: (a: any, b: any) => a.name.localeCompare(b.name) },
     { title: 'Designation', dataIndex: 'designation', key: 'designation' },
-    ...(isAuthenticated || !!visibility?.fields.email ? [{ title: 'Govt Email', dataIndex: 'govtEmail', key: 'govtEmail', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.email, '🔒 masked') }] : []),
-    ...(isAuthenticated ? [{ title: 'Personal Email', dataIndex: 'personalEmail', key: 'personalEmail', render: (val: string) => renderMaskedField(val, isAuthenticated, '🔒 masked') }] : []),
-    ...(isAuthenticated || !!visibility?.fields.phone ? [{ title: 'Phone Number', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') }] : []),
+    { title: 'Govt Email', dataIndex: 'govtEmail', key: 'govtEmail'},
+    { title: 'Personal Email', dataIndex: 'personalEmail', key: 'personalEmail'},
+    { title: 'DOB', dataIndex: 'dob', key: 'dob'},
+    { title: 'DOJ', dataIndex: 'doj', key: 'doj'},
+    { title: 'Department Location', dataIndex: 'departmentLocation', key: 'departmentLocation'},
+    { title: 'Room', dataIndex: 'roomNumber', key: 'roomNumber'},
     { title: 'Category', dataIndex: 'category', key: 'category', render: (cat: string) => <Tag color="blue">{cat}</Tag> },
-    ...(isAuthenticated || !!visibility?.fields.dob ? [{ title: 'DOB', dataIndex: 'dob', key: 'dob', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.dob, '🔒 masked') }] : []),
-    { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> }
+    { title: 'Status', dataIndex: 'status', key: 'status', render: (status: string) => <Tag color={status === 'Active' ? 'green' : 'red'}>{status}</Tag> },
+    ...(isAuthenticated || !!visibility?.fields.phone ? [{ title: 'Phone Number', dataIndex: 'phone', key: 'phone', render: (val: string) => renderMaskedField(val, isAuthenticated || !!visibility?.fields.phone, '🔒 masked') }] : []),
   ];
 
   const getProjectColumns = () => [
@@ -116,7 +119,7 @@ export function PublicScientistsView({
         <Table 
           columns={getScientistColumns()} 
           dataSource={scientists} 
-          pagination={{ pageSize: 8 }} 
+          pagination={{ pageSize: 15 }} 
           size="middle" 
           rowKey="id" 
           scroll={{ x: 'max-content' }}
