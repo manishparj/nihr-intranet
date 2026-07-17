@@ -1684,7 +1684,7 @@ router.post('/store/auth/login', (req: Request, res: Response) => {
   }
 
   // Support plain text 'admin' or hashed password match
-  const isDefaultStorePass = password === 'admin' && user.passwordHash === 'c7c2299886f3b060d40fae41846b412bf087b7a8dcb974fbf30cf611be247854';
+  const isDefaultStorePass = password === 'admin' && user.passwordHash === '1a34c866f5d9aceb206cb656ecf41dd1e810fcc13f0d9b2904b4ec61b5023852';
   const isHashedMatch = hashPassword(password) === user.passwordHash;
 
   if (!isDefaultStorePass && !isHashedMatch) {

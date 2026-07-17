@@ -304,9 +304,9 @@ export function OutsourcingPortal({ currentAdmin, isAuthenticated }: Outsourcing
 
   const removeExpItem = (type: 'icmr' | 'non-icmr', idx: number) => {
     if (type === 'icmr') {
-      setPrevIcmrExp(prevIcmrExp.filter((_, i) => i !== idx));
+      setPrevIcmrExp(prevIcmrExp?.filter((_, i) => i !== idx));
     } else {
-      setPrevNonIcmrExp(prevNonIcmrExp.filter((_, i) => i !== idx));
+      setPrevNonIcmrExp(prevNonIcmrExp?.filter((_, i) => i !== idx));
     }
   };
 
@@ -315,23 +315,23 @@ export function OutsourcingPortal({ currentAdmin, isAuthenticated }: Outsourcing
   
   const totalAgencies = agencies.length;
   const totalEmployees = employees.length;
-  const activeEmployees = employees.filter(e => e.status === 'Active').length;
-  const inactiveEmployees = employees.filter(e => e.status === 'Left').length;
+  const activeEmployees = employees?.filter(e => e.status === 'Active').length;
+  const inactiveEmployees = employees?.filter(e => e.status === 'Left').length;
 
   // Contracts expiring within 30, 60, 90 days
-  const expiring30 = agencies.filter(a => {
+  const expiring30 = agencies?.filter(a => {
     if (!a.contractEndDate) return false;
     const diffDays = dayjs(a.contractEndDate).diff(today, 'day');
     return diffDays >= 0 && diffDays <= 30;
   }).length;
 
-  const expiring60 = agencies.filter(a => {
+  const expiring60 = agencies?.filter(a => {
     if (!a.contractEndDate) return false;
     const diffDays = dayjs(a.contractEndDate).diff(today, 'day');
     return diffDays >= 0 && diffDays <= 60;
   }).length;
 
-  const expiring90 = agencies.filter(a => {
+  const expiring90 = agencies?.filter(a => {
     if (!a.contractEndDate) return false;
     const diffDays = dayjs(a.contractEndDate).diff(today, 'day');
     return diffDays >= 0 && diffDays <= 90;
@@ -512,13 +512,13 @@ export function OutsourcingPortal({ currentAdmin, isAuthenticated }: Outsourcing
   ];
 
   // Filtering lists
-  const filteredAgencies = agencies.filter(a => 
+  const filteredAgencies = agencies?.filter(a => 
     a.agencyName.toLowerCase().includes(agencySearch.toLowerCase()) ||
     a.agreementNo.toLowerCase().includes(agencySearch.toLowerCase()) ||
     a.contactPerson.toLowerCase().includes(agencySearch.toLowerCase())
   );
 
-  const filteredEmployees = employees.filter(e => 
+  const filteredEmployees = employees?.filter(e => 
     e.employeeName.toLowerCase().includes(employeeSearch.toLowerCase()) ||
     e.employeeId.toLowerCase().includes(employeeSearch.toLowerCase()) ||
     e.designation.toLowerCase().includes(employeeSearch.toLowerCase()) ||
@@ -1062,7 +1062,7 @@ export function OutsourcingPortal({ currentAdmin, isAuthenticated }: Outsourcing
         width={750}
       >
         {selectedAgency && (() => {
-          const agencyEmployees = employees.filter(e => e.agencyId === selectedAgency.id);
+          const agencyEmployees = employees?.filter(e => e.agencyId === selectedAgency.id);
           return (
             <div className="space-y-4 pt-4 text-xs">
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">

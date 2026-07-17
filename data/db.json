@@ -34,7 +34,7 @@
       "id": "admin-6",
       "name": "Store Dept (Mukesh Panwar)",
       "email": "storenihr@gmail.com",
-      "passwordHash": "$2b$10$EPfG3vA9MAMv.uJ8qPqCqOlUoQ2S/m4Lz/ImsE58i7l3nB7mJly62"
+      "passwordHash": "1a34c866f5d9aceb206cb656ecf41dd1e810fcc13f0d9b2904b4ec61b5023852"
     }
   ],
   "scientists": [
@@ -518,7 +518,7 @@
       "id": "ssu-1",
       "name": "Store Dept (Mukesh Panwar)",
       "email": "storenihr@gmail.com",
-      "passwordHash": "c7c2299886f3b060d40fae41846b412bf087b7a8dcb974fbf30cf611be247854"
+      "passwordHash": "1a34c866f5d9aceb206cb656ecf41dd1e810fcc13f0d9b2904b4ec61b5023852"
     }
   ]
 }
