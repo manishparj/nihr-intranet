@@ -483,3 +483,152 @@ export const calculateOutsourcedEmployeeTenureStatus = (staff: any, agency: any)
   };
 };
 
+export const calculateYPConsultantTenureStatus = (staff: any) => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  
+  // A. Previous ICMR Experience
+  let prevIcmrDays = 0;
+  if (staff && staff.previousIcmrExperience && Array.isArray(staff.previousIcmrExperience)) {
+    staff.previousIcmrExperience.forEach((entry: any) => {
+      const start = parseDateFlexible(entry.fromDate);
+      const end = parseDateFlexible(entry.toDate);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // inclusive
+        prevIcmrDays += diffDays;
+      }
+    });
+  }
+
+  // B. Current Experience (DOJ to Today or lastWorkingDate if Left)
+  let currentIcmrDays = 0;
+  let currentIcmrEnd = todayStr;
+  if (staff && staff.status === 'Left' && staff.lastWorkingDate) {
+    currentIcmrEnd = staff.lastWorkingDate;
+  }
+  if (staff && staff.doj) {
+    const start = parseDateFlexible(staff.doj);
+    const end = parseDateFlexible(currentIcmrEnd);
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // inclusive
+      currentIcmrDays += diffDays;
+    }
+  }
+
+  // C. Total ICMR EXP (Previous + Current)
+  const totalIcmrDays = prevIcmrDays + currentIcmrDays;
+
+  // Days to Y-M-D conversion helper
+  const daysToYMD = (totalDays: number) => {
+    const y = Math.floor(totalDays / 365.25);
+    const remainingDaysAfterY = totalDays - (y * 365.25);
+    const m = Math.floor(remainingDaysAfterY / 30.4375);
+    const d = Math.round(remainingDaysAfterY - (m * 30.4375));
+    return { y, m, d };
+  };
+
+  const prevIcmrYMD = daysToYMD(prevIcmrDays);
+  const currentIcmrYMD = daysToYMD(currentIcmrDays);
+  const totalIcmrYMD = daysToYMD(totalIcmrDays);
+
+  // D. Non-ICMR Experience
+  let nonIcmrDays = 0;
+  if (staff && staff.previousNonIcmrExperience && Array.isArray(staff.previousNonIcmrExperience)) {
+    staff.previousNonIcmrExperience.forEach((entry: any) => {
+      const start = parseDateFlexible(entry.fromDate);
+      const end = parseDateFlexible(entry.toDate);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // inclusive
+        nonIcmrDays += diffDays;
+      }
+    });
+  }
+  const nonIcmrYMD = daysToYMD(nonIcmrDays);
+
+  // E. Cumulative Experience Month Totals (Total ICMR + Non-ICMR)
+  const cumulativeDays = totalIcmrDays + nonIcmrDays;
+  const cumulativeYMD = daysToYMD(cumulativeDays);
+  const cumulativeTotalMonths = cumulativeDays / 30.4375;
+
+  // F. Cut Off Date calculation
+  // 5 Years (60 months) limit = 1826 days
+  const icmrFiveYearLimitDays = 1826;
+  let limitDate: Date | null = null;
+  let limitDateStr = 'N/A';
+  if (staff && staff.doj) {
+    const dojDate = parseDateFlexible(staff.doj);
+    if (!isNaN(dojDate.getTime())) {
+      const daysNeeded = icmrFiveYearLimitDays - prevIcmrDays;
+      const tempLimitDate = new Date(dojDate.getTime());
+      tempLimitDate.setDate(tempLimitDate.getDate() + daysNeeded);
+      limitDate = tempLimitDate;
+      limitDateStr = tempLimitDate.toISOString().split('T')[0];
+    }
+  }
+
+  let cutOffDate = limitDate;
+  let cutOffDateStr = limitDateStr;
+  let cutOffReason = '5-Year ICMR Limit';
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  
+  let isRedFlag = false;
+  let remainingDays = 0;
+  let isExceeded = false;
+  let remainingText = 'N/A';
+
+  if (cutOffDate) {
+    const compareDate = new Date(cutOffDate);
+    compareDate.setHours(0,0,0,0);
+    const diffTime = compareDate.getTime() - today.getTime();
+    remainingDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (remainingDays < 0) {
+      isExceeded = true;
+      isRedFlag = true;
+      const exceededDays = Math.abs(remainingDays);
+      const exceededYMD = daysToYMD(exceededDays);
+      let parts = [];
+      if (exceededYMD.y > 0) parts.push(`${exceededYMD.y}y`);
+      if (exceededYMD.m > 0) parts.push(`${exceededYMD.m}m`);
+      if (exceededYMD.d > 0 || parts.length === 0) parts.push(`${exceededYMD.d}d`);
+      remainingText = `Exceeded by ${parts.join(' ')}`;
+    } else {
+      if (remainingDays <= 30) {
+        isRedFlag = true;
+      }
+      const remYMD = daysToYMD(remainingDays);
+      let parts = [];
+      if (remYMD.y > 0) parts.push(`${remYMD.y}y`);
+      if (remYMD.m > 0) parts.push(`${remYMD.m}m`);
+      if (remYMD.d > 0 || parts.length === 0) parts.push(`${remYMD.d}d`);
+      remainingText = `${parts.join(' ')} remaining`;
+    }
+  }
+
+  return {
+    prevIcmrDays,
+    prevIcmrYMD,
+    currentIcmrDays,
+    currentIcmrYMD,
+    totalIcmrDays,
+    totalIcmrYMD,
+    totalIcmrMonths: totalIcmrDays / 30.4375,
+    nonIcmrDays,
+    nonIcmrYMD,
+    cumulativeDays,
+    cumulativeYMD,
+    cumulativeTotalMonths,
+    limitDateStr,
+    cutOffDateStr,
+    cutOffReason,
+    isRedFlag,
+    isExceeded,
+    remainingDays,
+    remainingText
+  };
+};
+

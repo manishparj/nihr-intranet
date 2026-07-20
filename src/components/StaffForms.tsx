@@ -645,6 +645,7 @@ export const YPConsultantForm: React.FC<YPConsultantFormProps> = ({
     aadhaarNumber: '', panNumber: '', accountNumber: '', ifscCode: '', bankName: '',
     departmentLocation: '', roomNumber: '', address: '', emergencyContact: '',
     category: 'UR', status: 'Active', lastWorkingDate: '', leavingReason: '', noDuesCleared: false,
+    previousIcmrExperience: [], previousNonIcmrExperience: [],
     ...initialValues,
   };
 
@@ -654,170 +655,283 @@ export const YPConsultantForm: React.FC<YPConsultantFormProps> = ({
       validationSchema={ypConsultantSchema}
       onSubmit={onSubmit}
     >
-      {({ values, setFieldValue, isSubmitting }) => (
-        <Form className="space-y-4">
-          <Row gutter={[16, 12]}>
-            <Col xs={24} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Full Name</label>
-              <Field as={Input} name="name" placeholder="John Doe" className="rounded-md" />
-              <ErrorMessage name="name" component="div" className="text-red-500 text-[10px] mt-0.5" />
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Designation Type</label>
-              <Select value={values.designationType} onChange={(v) => setFieldValue('designationType', v)} className="w-full">
-                <Option value="Young Professional">Young Professional</Option>
-                <Option value="Consultant">Consultant</Option>
-              </Select>
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Employee Code (Optional)</label>
-              <Field as={Input} name="employeeCode" placeholder="Auto-generates if empty" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">DOB</label>
-              <Field as={Input} type="date" name="dob" className="rounded-md w-full" />
-              <ErrorMessage name="dob" component="div" className="text-red-500 text-[10px] mt-0.5" />
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">DOJ</label>
-              <Field as={Input} type="date" name="doj" className="rounded-md w-full" />
-              <ErrorMessage name="doj" component="div" className="text-red-500 text-[10px] mt-0.5" />
-            </Col>
-            <Col xs={24} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Full Designation</label>
-              <Field as={Input} name="fullDesignation" placeholder="Young Professional II (IT) or Consultant (Virology)" className="rounded-md" />
-              <ErrorMessage name="fullDesignation" component="div" className="text-red-500 text-[10px] mt-0.5" />
-            </Col>
-            <Col xs={12} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Official Email</label>
-              <Field as={Input} name="email" placeholder="john.doe@nihr.res.in" className="rounded-md" />
-              <ErrorMessage name="email" component="div" className="text-red-500 text-[10px] mt-0.5" />
-            </Col>
-            <Col xs={12} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Phone Number</label>
-              <Field as={Input} name="phone" placeholder="+91 90001 20002" className="rounded-md" />
-              <ErrorMessage name="phone" component="div" className="text-red-500 text-[10px] mt-0.5" />
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Gender</label>
-              <Select value={values.gender} onChange={(v) => setFieldValue('gender', v)} className="w-full">
-                <Option value="Male">Male</Option>
-                <Option value="Female">Female</Option>
-                <Option value="Other">Other</Option>
-              </Select>
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Category</label>
-              <Select value={values.category} onChange={(v) => setFieldValue('category', v)} className="w-full">
-                {['SC', 'ST', 'OBC', 'PWD', 'EWS', 'UR'].map(c => (
-                  <Option key={c} value={c}>{c}</Option>
-                ))}
-              </Select>
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Blood Group</label>
-              <Field as={Input} name="bloodGroup" placeholder="A+" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Emergency Contact</label>
-              <Field as={Input} name="emergencyContact" placeholder="+91 99999 33333" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Aadhaar Card Number</label>
-              <Field as={Input} name="aadhaarNumber" placeholder="XXXX XXXX XXXX" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">PAN Card Number</label>
-              <Field as={Input} name="panNumber" placeholder="ABCDE1234F" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={8}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Name</label>
-              <Field as={Input} name="bankName" placeholder="Axis Bank" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={8}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Account</label>
-              <Field as={Input} name="accountNumber" placeholder="916000125438" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={8}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Bank IFSC</label>
-              <Field as={Input} name="ifscCode" placeholder="UTIB0000012" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={6}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Room Number</label>
-              <Field as={Input} name="roomNumber" placeholder="G-12" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={18}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Department Location</label>
-              <Field as={Input} name="departmentLocation" placeholder="IT Cell, Ground Floor" className="rounded-md" />
-            </Col>
-            <Col xs={24}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Permanent Residential Address</label>
-              <Field as={Input} name="address" placeholder="Munirka, New Delhi" className="rounded-md" />
-            </Col>
-            <Col xs={12} md={8}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Status</label>
-              <Select value={values.status} onChange={(v) => setFieldValue('status', v)} className="w-full">
-                <Option value="Active">Active</Option>
-                <Option value="Left">Left</Option>
-              </Select>
-            </Col>
+      {({ values, setFieldValue, isSubmitting }) => {
+        // Calculate Dynamic Experience
+        const icmrMonths = calculateDynamicExperience(values.previousIcmrExperience || []);
+        const nonIcmrMonths = calculateDynamicExperience(values.previousNonIcmrExperience || []);
+        
+        // Current experience
+        let currentMonths = 0;
+        if (values.doj) {
+          const start = new Date(values.doj);
+          const endStr = values.status === 'Left' && values.lastWorkingDate
+            ? values.lastWorkingDate
+            : new Date().toISOString().split('T')[0];
+          const end = new Date(endStr);
+          if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            currentMonths = Math.round(diffTime / (1000 * 60 * 60 * 24 * 30.4));
+          }
+        }
 
-            {values.status === 'Left' && (
-              <>
-                <Col xs={12} md={8}>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Last Working Date</label>
-                  <Field as={Input} type="date" name="lastWorkingDate" className="rounded-md w-full" />
-                </Col>
-                <Col xs={24} md={8}>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Leaving Reason</label>
-                  <Field as={Input} name="leavingReason" placeholder="Resigned / Contract Over" className="rounded-md" />
-                </Col>
-                <Col xs={24} className="flex items-center pt-3">
-                  <Checkbox 
-                    checked={values.noDuesCleared} 
-                    onChange={(e) => setFieldValue('noDuesCleared', e.target.checked)}
-                  >
-                    No Dues Clearance Completed
-                  </Checkbox>
-                </Col>
-              </>
-            )}
+        const totalIcmrMonths = icmrMonths + currentMonths;
+        const totalMonths = icmrMonths + nonIcmrMonths + currentMonths;
 
-            <Col xs={24}>
-              <Divider className="my-1 border-slate-100" />
-            </Col>
+        return (
+          <Form className="space-y-4">
+            <Row gutter={[16, 12]}>
+              <Col xs={24} md={12}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Full Name</label>
+                <Field as={Input} name="name" placeholder="John Doe" className="rounded-md" />
+                <ErrorMessage name="name" component="div" className="text-red-500 text-[10px] mt-0.5" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Designation Type</label>
+                <Select value={values.designationType} onChange={(v) => setFieldValue('designationType', v)} className="w-full">
+                  <Option value="Young Professional">Young Professional</Option>
+                  <Option value="Consultant">Consultant</Option>
+                </Select>
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Employee Code (Optional)</label>
+                <Field as={Input} name="employeeCode" placeholder="Auto-generates if empty" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">DOB</label>
+                <Field as={Input} type="date" name="dob" className="rounded-md w-full" />
+                <ErrorMessage name="dob" component="div" className="text-red-500 text-[10px] mt-0.5" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">DOJ</label>
+                <Field as={Input} type="date" name="doj" className="rounded-md w-full" />
+                <ErrorMessage name="doj" component="div" className="text-red-500 text-[10px] mt-0.5" />
+              </Col>
+              <Col xs={24} md={12}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Full Designation</label>
+                <Field as={Input} name="fullDesignation" placeholder="Young Professional II (IT) or Consultant (Virology)" className="rounded-md" />
+                <ErrorMessage name="fullDesignation" component="div" className="text-red-500 text-[10px] mt-0.5" />
+              </Col>
+              <Col xs={12} md={12}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Official Email</label>
+                <Field as={Input} name="email" placeholder="john.doe@nihr.res.in" className="rounded-md" />
+                <ErrorMessage name="email" component="div" className="text-red-500 text-[10px] mt-0.5" />
+              </Col>
+              <Col xs={12} md={12}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Phone Number</label>
+                <Field as={Input} name="phone" placeholder="+91 90001 20002" className="rounded-md" />
+                <ErrorMessage name="phone" component="div" className="text-red-500 text-[10px] mt-0.5" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Gender</label>
+                <Select value={values.gender} onChange={(v) => setFieldValue('gender', v)} className="w-full">
+                  <Option value="Male">Male</Option>
+                  <Option value="Female">Female</Option>
+                  <Option value="Other">Other</Option>
+                </Select>
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Category</label>
+                <Select value={values.category} onChange={(v) => setFieldValue('category', v)} className="w-full">
+                  {['SC', 'ST', 'OBC', 'PWD', 'EWS', 'UR'].map(c => (
+                    <Option key={c} value={c}>{c}</Option>
+                  ))}
+                </Select>
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Blood Group</label>
+                <Field as={Input} name="bloodGroup" placeholder="A+" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Emergency Contact</label>
+                <Field as={Input} name="emergencyContact" placeholder="+91 99999 33333" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={12}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Aadhaar Card Number</label>
+                <Field as={Input} name="aadhaarNumber" placeholder="XXXX XXXX XXXX" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={12}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">PAN Card Number</label>
+                <Field as={Input} name="panNumber" placeholder="ABCDE1234F" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={8}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Name</label>
+                <Field as={Input} name="bankName" placeholder="Axis Bank" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={8}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Bank Account</label>
+                <Field as={Input} name="accountNumber" placeholder="916000125438" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={8}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Bank IFSC</label>
+                <Field as={Input} name="ifscCode" placeholder="UTIB0000012" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={6}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Room Number</label>
+                <Field as={Input} name="roomNumber" placeholder="G-12" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={18}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Department Location</label>
+                <Field as={Input} name="departmentLocation" placeholder="IT Cell, Ground Floor" className="rounded-md" />
+              </Col>
+              <Col xs={24}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Permanent Residential Address</label>
+                <Field as={Input} name="address" placeholder="Munirka, New Delhi" className="rounded-md" />
+              </Col>
+              <Col xs={12} md={8}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Status</label>
+                <Select value={values.status} onChange={(v) => setFieldValue('status', v)} className="w-full">
+                  <Option value="Active">Active</Option>
+                  <Option value="Left">Left</Option>
+                </Select>
+              </Col>
 
-            <Col xs={24} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo (Optional)</label>
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      setFieldValue('photoName', file.name);
-                      setFieldValue('photoData', reader.result as string);
-                      message.success(`${file.name} loaded successfully.`);
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }} 
-                className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-              />
-              {values.photoUrl && <div className="text-[10px] text-green-600 mt-1">✔️ Current Photo: <a href={values.photoUrl} target="_blank" rel="noreferrer" className="underline font-semibold">View uploaded photo</a></div>}
-              {values.photoName && <div className="text-[10px] text-blue-600 mt-1">Pending: {values.photoName}</div>}
-            </Col>
-          </Row>
+              {values.status === 'Left' && (
+                <>
+                  <Col xs={12} md={8}>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Last Working Date</label>
+                    <Field as={Input} type="date" name="lastWorkingDate" className="rounded-md w-full" />
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Leaving Reason</label>
+                    <Field as={Input} name="leavingReason" placeholder="Resigned / Contract Over" className="rounded-md" />
+                  </Col>
+                  <Col xs={24} className="flex items-center pt-3">
+                    <Checkbox 
+                      checked={values.noDuesCleared} 
+                      onChange={(e) => setFieldValue('noDuesCleared', e.target.checked)}
+                    >
+                      No Dues Clearance Completed
+                    </Checkbox>
+                  </Col>
+                </>
+              )}
 
-          <Divider className="my-4" />
-          <div className="flex justify-end gap-2">
-            <Button onClick={onCancel}>Cancel</Button>
-            <Button type="primary" htmlType="submit" loading={isSubmitting}>Save Member</Button>
-          </div>
-        </Form>
-      )}
+              <Col xs={24}>
+                <Divider className="my-1 border-slate-100" />
+              </Col>
+
+              <Col xs={24} md={12}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo (Optional)</label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setFieldValue('photoName', file.name);
+                        setFieldValue('photoData', reader.result as string);
+                        message.success(`${file.name} loaded successfully.`);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }} 
+                  className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                />
+                {values.photoUrl && <div className="text-[10px] text-green-600 mt-1">✔️ Current Photo: <a href={values.photoUrl} target="_blank" rel="noreferrer" className="underline font-semibold">View uploaded photo</a></div>}
+                {values.photoName && <div className="text-[10px] text-blue-600 mt-1">Pending: {values.photoName}</div>}
+              </Col>
+            </Row>
+
+            <Divider className="my-2" />
+            <div className="bg-slate-50 dark:bg-zinc-950/40 p-3 rounded-lg border border-slate-100 dark:border-zinc-800 flex flex-col gap-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-600">Calculated Dynamic Experience:</span>
+                <span className="text-xs font-bold text-blue-600">
+                  Total ICMR Exp: {totalIcmrMonths} Months | Total Exp: {totalMonths} Months
+                </span>
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-500">
+                <span>(Prev ICMR: {icmrMonths}m | Prev Non-ICMR: {nonIcmrMonths}m | Current DOJ to Today: {currentMonths}m)</span>
+              </div>
+              {totalIcmrMonths >= 60 && (
+                <div className="text-red-500 text-xs font-bold mt-1">
+                  🚨 Warning: Total ICMR Experience exceeds or equals 5 Years (60 Months limit).
+                </div>
+              )}
+            </div>
+
+            {/* Previous ICMR Exp Array */}
+            <Card size="small" title={<span className="text-xs font-bold">Previous ICMR Experience (Optional)</span>} className="mb-4">
+              <FieldArray name="previousIcmrExperience">
+                {({ push, remove }) => (
+                  <div className="space-y-2">
+                    {(values.previousIcmrExperience || []).map((exp: any, index: number) => (
+                      <Row gutter={8} key={exp.id || index} className="items-end bg-slate-50/50 dark:bg-zinc-900/20 p-2 rounded-md border border-slate-100/30">
+                        <Col xs={24} sm={8}>
+                          <label className="text-[10px] text-slate-500 block">Institute Name</label>
+                          <Field as={Input} name={`previousIcmrExperience.${index}.instituteName`} placeholder="ICMR-NIV, Pune" size="small" />
+                        </Col>
+                        <Col xs={12} sm={6}>
+                          <label className="text-[10px] text-slate-500 block">Designation</label>
+                          <Field as={Input} name={`previousIcmrExperience.${index}.designation`} placeholder="JRF" size="small" />
+                        </Col>
+                        <Col xs={6} sm={4}>
+                          <label className="text-[10px] text-slate-500 block">From</label>
+                          <Field as={Input} type="date" name={`previousIcmrExperience.${index}.fromDate`} size="small" />
+                        </Col>
+                        <Col xs={6} sm={4}>
+                          <label className="text-[10px] text-slate-500 block">To</label>
+                          <Field as={Input} type="date" name={`previousIcmrExperience.${index}.toDate`} size="small" />
+                        </Col>
+                        <Col xs={24} sm={2} className="text-right">
+                          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(index)} />
+                        </Col>
+                      </Row>
+                    ))}
+                    <Button type="dashed" block size="small" icon={<PlusOutlined />} onClick={() => push({ id: `exp-${Date.now()}`, instituteName: '', designation: '', fromDate: '', toDate: '' })}>
+                      Add Previous ICMR Entry
+                    </Button>
+                  </div>
+                )}
+              </FieldArray>
+            </Card>
+
+            {/* Previous Non-ICMR Exp Array */}
+            <Card size="small" title={<span className="text-xs font-bold">Previous Non-ICMR Experience (Optional)</span>}>
+              <FieldArray name="previousNonIcmrExperience">
+                {({ push, remove }) => (
+                  <div className="space-y-2">
+                    {(values.previousNonIcmrExperience || []).map((exp: any, index: number) => (
+                      <Row gutter={8} key={exp.id || index} className="items-end bg-slate-50/50 dark:bg-zinc-900/20 p-2 rounded-md border border-slate-100/30">
+                        <Col xs={24} sm={8}>
+                          <label className="text-[10px] text-slate-500 block">Institute Name</label>
+                          <Field as={Input} name={`previousNonIcmrExperience.${index}.instituteName`} placeholder="AIIMS, New Delhi" size="small" />
+                        </Col>
+                        <Col xs={12} sm={6}>
+                          <label className="text-[10px] text-slate-500 block">Designation</label>
+                          <Field as={Input} name={`previousNonIcmrExperience.${index}.designation`} placeholder="Lab Assistant" size="small" />
+                        </Col>
+                        <Col xs={6} sm={4}>
+                          <label className="text-[10px] text-slate-500 block">From</label>
+                          <Field as={Input} type="date" name={`previousNonIcmrExperience.${index}.fromDate`} size="small" />
+                        </Col>
+                        <Col xs={6} sm={4}>
+                          <label className="text-[10px] text-slate-500 block">To</label>
+                          <Field as={Input} type="date" name={`previousNonIcmrExperience.${index}.toDate`} size="small" />
+                        </Col>
+                        <Col xs={24} sm={2} className="text-right">
+                          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(index)} />
+                        </Col>
+                      </Row>
+                    ))}
+                    <Button type="dashed" block size="small" icon={<PlusOutlined />} onClick={() => push({ id: `exp-${Date.now()}`, instituteName: '', designation: '', fromDate: '', toDate: '' })}>
+                      Add Previous Non-ICMR Entry
+                    </Button>
+                  </div>
+                )}
+              </FieldArray>
+            </Card>
+
+            <Divider className="my-4" />
+            <div className="flex justify-end gap-2">
+              <Button onClick={onCancel}>Cancel</Button>
+              <Button type="primary" htmlType="submit" loading={isSubmitting}>Save Member</Button>
+            </div>
+          </Form>
+        );
+      }}
     </Formik>
   );
 };

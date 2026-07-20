@@ -360,7 +360,18 @@ export function OutsourcingPortal({ currentAdmin, isAuthenticated }: Outsourcing
       dataIndex: 'agencyName', 
       key: 'agencyName', 
       className: 'font-bold text-slate-800',
-      sorter: (a: Agency, b: Agency) => a.agencyName.localeCompare(b.agencyName) 
+      sorter: (a: Agency, b: Agency) => a.agencyName.localeCompare(b.agencyName),
+      render: (text: string, record: Agency) => (
+        <span 
+          className="text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer font-bold"
+          onClick={() => {
+            setSelectedAgency(record);
+            setAgencyDetailOpen(true);
+          }}
+        >
+          {text}
+        </span>
+      )
     },
     { title: 'Agreement No.', dataIndex: 'agreementNo', key: 'agreementNo' },
     { 
@@ -437,7 +448,27 @@ export function OutsourcingPortal({ currentAdmin, isAuthenticated }: Outsourcing
       sorter: (a: OutsourcedEmployee, b: OutsourcedEmployee) => a.employeeName.localeCompare(b.employeeName)
     },
     { title: 'Designation', dataIndex: 'designation', key: 'designation' },
-    { title: 'Assigned Agency', dataIndex: 'agencyName', key: 'agencyName' },
+    { 
+      title: 'Assigned Agency', 
+      dataIndex: 'agencyName', 
+      key: 'agencyName',
+      render: (text: string, record: OutsourcedEmployee) => {
+        const agencyObj = agencies.find(a => a.id === record.agencyId);
+        return agencyObj ? (
+          <span 
+            className="text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer font-bold"
+            onClick={() => {
+              setSelectedAgency(agencyObj);
+              setAgencyDetailOpen(true);
+            }}
+          >
+            {text}
+          </span>
+        ) : (
+          <span>{text || '-'}</span>
+        );
+      }
+    },
     { title: 'Department/Section', dataIndex: 'departmentSectionLocation', key: 'departmentSectionLocation' },
     { 
       title: 'Tenure Remaining / Exceeded', 
@@ -627,15 +658,25 @@ export function OutsourcingPortal({ currentAdmin, isAuthenticated }: Outsourcing
               <p className="text-xs text-slate-400 py-6 text-center">No active outsourced personnel deployed currently.</p>
             ) : (
               Object.entries(agencyCounts).map(([agency, count]) => {
-                const percentage = totalEmployees > 0 ? Math.round((count / activeEmployees) * 100) : 0;
+                const percentage = activeEmployees > 0 ? Math.round((count / activeEmployees) * 100) : 0;
+                const agencyObj = agencies.find(a => a.agencyName === agency);
                 return (
-                  <div key={agency} className="flex flex-col gap-1 text-xs">
-                    <div className="flex justify-between font-medium text-slate-700">
-                      <span className="truncate max-w-[80%]">{agency}</span>
+                  <div 
+                    key={agency} 
+                    className="flex flex-col gap-1 text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 p-1.5 rounded transition-colors group"
+                    onClick={() => {
+                      if (agencyObj) {
+                        setSelectedAgency(agencyObj);
+                        setAgencyDetailOpen(true);
+                      }
+                    }}
+                  >
+                    <div className="flex justify-between font-medium text-slate-700 dark:text-zinc-300">
+                      <span className="truncate max-w-[80%] text-indigo-600 group-hover:text-indigo-800 group-hover:underline font-bold">{agency}</span>
                       <span>{count} deployed</span>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${percentage}%` }}></div>
+                    <div className="w-full bg-slate-100 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-indigo-600 h-full rounded-full group-hover:bg-indigo-700 transition-colors" style={{ width: `${percentage}%` }}></div>
                     </div>
                   </div>
                 );

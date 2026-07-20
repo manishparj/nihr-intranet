@@ -591,6 +591,75 @@ router.post('/pending-project-staff/:id/reject', authenticateAdmin, (req: Reques
 });
 
 // ==========================================
+// PENDING YP & CONSULTANT SELF-REGISTRATION ENDPOINTS
+// ==========================================
+router.get('/pending-yp-consultants', authenticateAdmin, (req: Request, res: Response) => {
+  res.json(Database.get('pendingYPConsultants') || []);
+});
+
+router.post('/pending-yp-consultants', (req: Request, res: Response) => {
+  const pending = Database.get('pendingYPConsultants') || [];
+  
+  let body = processProfilePhoto(req.body);
+  const newPending: any = {
+    ...body,
+    id: `pending-${Date.now()}`,
+    status: 'Active', // Default status once approved
+  };
+
+  pending.push(newPending);
+  Database.set('pendingYPConsultants', pending);
+  res.status(201).json(newPending);
+});
+
+router.post('/pending-yp-consultants/:id/approve', authenticateAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const pending = Database.get('pendingYPConsultants') || [];
+  const pendingRecord = pending.find(p => p.id === id);
+
+  if (!pendingRecord) {
+    return res.status(404).json({ error: 'Pending registration not found' });
+  }
+
+  const staff = Database.get('ypConsultants') || [];
+
+  // Generate employeeCode: YP-XXXX or CONS-XXXX
+  const prefix = pendingRecord.designationType === 'Consultant' ? 'CONS-' : 'YP-';
+  const existingCodes = staff
+    .map(s => s.employeeCode)
+    .filter(code => code && code.startsWith(prefix))
+    .map(code => parseInt(code.split('-')[1], 10))
+    .filter(num => !isNaN(num));
+  const highestNum = existingCodes.length > 0 ? Math.max(...existingCodes) : 999;
+  const employeeCode = `${prefix}${highestNum + 1}`;
+
+  const activeStaff: YPConsultant = {
+    ...pendingRecord,
+    id: `ypc-${Date.now()}`, // new active id
+    employeeCode,
+    status: 'Active' as 'Active' | 'Left',
+    noDuesCleared: false
+  };
+
+  staff.push(activeStaff);
+  Database.set('ypConsultants', staff);
+
+  // Remove from pending
+  const remainingPending = pending.filter(p => p.id !== id);
+  Database.set('pendingYPConsultants', remainingPending);
+
+  res.json({ success: true, approvedRecord: activeStaff });
+});
+
+router.post('/pending-yp-consultants/:id/reject', authenticateAdmin, (req: Request, res: Response) => {
+  const { id } = req.params;
+  const pending = Database.get('pendingYPConsultants') || [];
+  const remainingPending = pending.filter(p => p.id !== id);
+  Database.set('pendingYPConsultants', remainingPending);
+  res.json({ success: true });
+});
+
+// ==========================================
 // DATABASE FULL SECURITY BACKUP ENDPOINT
 // ==========================================
 router.get('/backup', authenticateAdmin, (req: Request, res: Response) => {
@@ -660,7 +729,34 @@ router.delete('/permanent-staff/:id', authenticateAdmin, (req: Request, res: Res
 // YP & CONSULTANT ENDPOINTS (CRUD)
 // ==========================================
 router.get('/yp-consultants', (req: Request, res: Response) => {
-  res.json(Database.get('ypConsultants'));
+  const list = Database.get('ypConsultants');
+  const enriched = list.map(s => {
+    const icmrExpMonths = calculateExperience(s.previousIcmrExperience || []);
+    const nonIcmrExpMonths = calculateExperience(s.previousNonIcmrExperience || []);
+    
+    // Calculate current experience months (DOJ to Today/lastWorkingDate)
+    let currentMonths = 0;
+    if (s.doj) {
+      const start = new Date(s.doj);
+      const endStr = s.status === 'Left' && s.lastWorkingDate
+        ? s.lastWorkingDate
+        : new Date().toISOString().split('T')[0];
+      const end = new Date(endStr);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start <= end) {
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        currentMonths = Math.round(diffTime / (1000 * 60 * 60 * 24 * 30.4));
+      }
+    }
+    const totalExpMonths = icmrExpMonths + nonIcmrExpMonths + currentMonths;
+
+    return {
+      ...s,
+      icmrExpMonths,
+      nonIcmrExpMonths,
+      totalExpMonths,
+    };
+  });
+  res.json(enriched);
 });
 
 router.post('/yp-consultants', authenticateAdmin, (req: Request, res: Response) => {
@@ -1803,75 +1899,6 @@ router.delete('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: Reque
   const employees = Database.get('outsourcedEmployees') || [];
   const filtered = employees.filter(e => e.id !== id);
   Database.set('outsourcedEmployees', filtered);
-  res.json({ success: true });
-});
-
-// ==========================================
-// PENDING YP & CONSULTANT SELF-REGISTRATION ENDPOINTS
-// ==========================================
-router.get('/pending-yp-consultants', authenticateAdmin, (req: Request, res: Response) => {
-  res.json(Database.get('pendingYPConsultants') || []);
-});
-
-router.post('/pending-yp-consultants', (req: Request, res: Response) => {
-  const pending = Database.get('pendingYPConsultants') || [];
-  
-  let body = processProfilePhoto(req.body);
-  const newPending: any = {
-    ...body,
-    id: `pending-${Date.now()}`,
-    status: 'Active', // Default status once approved
-  };
-
-  pending.push(newPending);
-  Database.set('pendingYPConsultants', pending);
-  res.status(201).json(newPending);
-});
-
-router.post('/pending-yp-consultants/:id/approve', authenticateAdmin, (req: Request, res: Response) => {
-  const { id } = req.params;
-  const pending = Database.get('pendingYPConsultants') || [];
-  const pendingRecord = pending.find(p => p.id === id);
-
-  if (!pendingRecord) {
-    return res.status(404).json({ error: 'Pending registration not found' });
-  }
-
-  const staff = Database.get('ypConsultants') || [];
-
-  // Generate employeeCode: YP-XXXX or CONS-XXXX
-  const prefix = pendingRecord.designationType === 'Consultant' ? 'CONS-' : 'YP-';
-  const existingCodes = staff
-    .map(s => s.employeeCode)
-    .filter(code => code && code.startsWith(prefix))
-    .map(code => parseInt(code.split('-')[1], 10))
-    .filter(num => !isNaN(num));
-  const highestNum = existingCodes.length > 0 ? Math.max(...existingCodes) : 999;
-  const employeeCode = `${prefix}${highestNum + 1}`;
-
-  const activeStaff: YPConsultant = {
-    ...pendingRecord,
-    id: `ypc-${Date.now()}`, // new active id
-    employeeCode,
-    status: 'Active' as 'Active' | 'Left',
-    noDuesCleared: false
-  };
-
-  staff.push(activeStaff);
-  Database.set('ypConsultants', staff);
-
-  // Remove from pending
-  const remainingPending = pending.filter(p => p.id !== id);
-  Database.set('pendingYPConsultants', remainingPending);
-
-  res.json({ success: true, approvedRecord: activeStaff });
-});
-
-router.post('/pending-yp-consultants/:id/reject', authenticateAdmin, (req: Request, res: Response) => {
-  const { id } = req.params;
-  const pending = Database.get('pendingYPConsultants') || [];
-  const remainingPending = pending.filter(p => p.id !== id);
-  Database.set('pendingYPConsultants', remainingPending);
   res.json({ success: true });
 });
 

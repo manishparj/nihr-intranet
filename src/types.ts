@@ -158,6 +158,11 @@ export interface YPConsultant {
   lastWorkingDate?: string;
   leavingReason?: string;
   noDuesCleared?: boolean;
+  previousIcmrExperience: ExperienceEntry[];
+  previousNonIcmrExperience: ExperienceEntry[];
+  icmrExpMonths?: number;
+  nonIcmrExpMonths?: number;
+  totalExpMonths?: number;
 }
 
 export interface Circular {
