@@ -98,7 +98,7 @@ export function PublicScientistsView({
 
     return (
       <div className="bg-slate-50/50 dark:bg-zinc-900/40 p-5 rounded-xl border border-slate-200/60 dark:border-zinc-800/80 m-2 transition-all duration-200">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8" style={{display: 'flex'}}>
+        <div>
           
           {/* Left Column: Profile Card & Administrative Metadata */}
           <div className="space-y-5">
