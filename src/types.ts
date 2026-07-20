@@ -24,6 +24,15 @@ export interface Scientist {
   status: 'Active' | 'Left';
   lastWorkingDate?: string;
   noDuesCleared?: boolean;
+  photoUrl?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  previousIcmrExperience?: ExperienceEntry[];
+  previousNonIcmrExperience?: ExperienceEntry[];
+  totalExpMonths?: number;
+  icmrExpMonths?: number;
+  nonIcmrExpMonths?: number;
 }
 
 export interface UtilizationCertificate {
@@ -89,6 +98,7 @@ export interface ProjectStaff {
   leavingReason?: string;
   noDuesCleared?: boolean;
   employeeCode: string; // TEMP-1000, etc.
+  photoUrl?: string;
   previousIcmrExperience: ExperienceEntry[];
   previousNonIcmrExperience: ExperienceEntry[];
   motherName?: string;
@@ -130,6 +140,14 @@ export interface PermanentStaff {
   lastWorkingDate?: string;
   leavingReason?: string;
   noDuesCleared?: boolean;
+  photoUrl?: string;
+  motherName?: string;
+  motherPhone?: string;
+  fatherName?: string;
+  fatherPhone?: string;
+  maritalStatus?: 'Single' | 'Married' | 'Divorced' | 'Widowed';
+  spouseName?: string;
+  spousePhone?: string;
 }
 
 export interface YPConsultant {
@@ -158,6 +176,14 @@ export interface YPConsultant {
   lastWorkingDate?: string;
   leavingReason?: string;
   noDuesCleared?: boolean;
+  photoUrl?: string;
+  motherName?: string;
+  motherPhone?: string;
+  fatherName?: string;
+  fatherPhone?: string;
+  maritalStatus?: 'Single' | 'Married' | 'Divorced' | 'Widowed';
+  spouseName?: string;
+  spousePhone?: string;
   previousIcmrExperience: ExperienceEntry[];
   previousNonIcmrExperience: ExperienceEntry[];
   icmrExpMonths?: number;

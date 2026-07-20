@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Card, Table, Tag, Button, Empty, Row, Col, Input, Select, Space, Badge, Progress } from 'antd';
+import { Card, Table, Tag, Input, Select, Badge, Progress, Row, Col, Button, Avatar } from 'antd';
 import { 
-  ProjectOutlined, SearchOutlined, DownloadOutlined, FilePdfOutlined, CalendarOutlined, BankOutlined, UserOutlined
+  ProjectOutlined, SearchOutlined, UserOutlined, CalendarOutlined, 
+  DownloadOutlined, FilePdfOutlined, TeamOutlined, DollarCircleOutlined
 } from '@ant-design/icons';
 import { Project, Scientist, VisibilityConfig, ProjectStaff } from '../types';
-import { calculateIcmrTenureStatus, formatYMD } from '../utils/experience';
 
 interface PublicProjectsViewProps {
   projects: Project[];
@@ -12,6 +12,7 @@ interface PublicProjectsViewProps {
   projectStaff: ProjectStaff[];
   visibility: VisibilityConfig | null;
   isAuthenticated: boolean;
+  onOpenDetails?: (record: any, type: 'scientist' | 'pstaff' | 'perm' | 'ypc') => void;
   handleDownloadBase64File: (fileName: string, fileData: string) => void;
 }
 
@@ -21,12 +22,13 @@ export function PublicProjectsView({
   projectStaff,
   visibility,
   isAuthenticated,
+  onOpenDetails,
   handleDownloadBase64File
 }: PublicProjectsViewProps) {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [typeFilter, setTypeFilter] = useState<string>('All');
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
 
   const getFilteredProjects = () => {
     return projects.filter(p => {
@@ -122,6 +124,202 @@ export function PublicProjectsView({
     }
   ];
 
+  // Render project expanded row details (Left side details, Right side lists)
+  const renderExpandedRow = (project: Project) => {
+    const assignedStaff = projectStaff.filter(s => s.projectId === project.id);
+    const piScientist = scientists.find(s => s.id === project.piId);
+
+    return (
+      <div className="bg-slate-50/50 dark:bg-zinc-900/40 p-5 rounded-xl border border-slate-200/60 dark:border-zinc-800/80 m-2 transition-all duration-200">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Left Column: Specifications & Timeline Progress */}
+          <div className="space-y-5">
+            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-3">
+              <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest block">Project Administrative Specification</span>
+              <h3 className="text-sm font-black text-slate-800 dark:text-zinc-100 m-0 mt-1">
+                📂 {project.name}
+              </h3>
+              <div className="flex items-center gap-2">
+                <Tag color="blue" className="text-xs uppercase font-extrabold rounded-md m-0">{project.shortName}</Tag>
+                <Tag color={project.status === 'Completed' ? 'green' : project.status === 'Ongoing' ? 'blue' : 'gray'}>
+                  {project.status}
+                </Tag>
+              </div>
+            </div>
+
+            {/* Financial and Timeline Info */}
+            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-3">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block border-b border-slate-100 dark:border-zinc-900 pb-1">
+                🔬 Funding & Timeline
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span className="block text-[10px] text-slate-400 font-medium">Funding Scheme</span>
+                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{project.type} Scheme</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-400 font-medium">Financial Outlay</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{(project.budget || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-400 font-medium">Commencement</span>
+                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{project.startDate}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-slate-400 font-medium">Scheduled End</span>
+                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{project.endDate}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="block text-[10px] text-slate-400 font-medium">Principal Investigator</span>
+                  <span className="font-bold text-slate-800 dark:text-zinc-200">
+                    {piScientist ? `Dr. ${piScientist.name}` : `ID: ${project.piId}`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="pt-2 border-t border-slate-100 dark:border-zinc-900">
+                <div className="flex justify-between items-center mb-1 text-[10px] font-bold text-slate-400 uppercase">
+                  <span>Project Lifecycle Completion</span>
+                  <span className="text-slate-700 dark:text-zinc-300">
+                    {project.pendingDays && project.durationDays ? (
+                      `${Math.max(0, Math.round(((project.durationDays - project.pendingDays) / project.durationDays) * 100))}%`
+                    ) : '0%'}
+                  </span>
+                </div>
+                {project.pendingDays && project.durationDays ? (
+                  <Progress 
+                    percent={Math.max(0, Math.min(100, Math.round(((project.durationDays - project.pendingDays) / project.durationDays) * 100)))} 
+                    strokeColor={{ '0%': '#10B981', '100%': '#3B82F6' }}
+                    showInfo={false}
+                    className="m-0 h-2"
+                  />
+                ) : <Progress percent={0} showInfo={false} />}
+                <div className="flex justify-between items-center mt-1 text-[9px] text-slate-400 font-mono">
+                  <span>Start: {project.startDate}</span>
+                  <span>{project.pendingDays || 0} days remaining</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: UCs, Reports & Assigned Staff list */}
+          <div className="space-y-5">
+            {/* Utilization Certificates */}
+            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-3">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block border-b border-slate-100 dark:border-zinc-900 pb-1">
+                📋 Official Project Utilization Certificates (UCs)
+              </span>
+              <div className="space-y-2">
+                <div>
+                  <span className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Provisional UCs</span>
+                  {project.provisionalUCs && project.provisionalUCs.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {project.provisionalUCs.map((uc, idx) => (
+                        <div key={uc.id || idx} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800 text-xs">
+                          <span className="font-bold text-slate-700 dark:text-zinc-300 truncate max-w-[120px]" title={uc.period}>📅 {uc.period}</span>
+                          <Button 
+                            type="primary" 
+                            size="small" 
+                            icon={<DownloadOutlined />} 
+                            className="text-[10px] h-6 px-2.5 rounded-md font-extrabold border-0 bg-blue-600 hover:bg-blue-500"
+                            onClick={() => handleDownloadBase64File(uc.fileName, uc.fileData)}
+                          >
+                            PDF
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-slate-400 italic block pl-1">No provisional UCs registered</span>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 dark:border-zinc-900">
+                  <span className="text-[9px] text-slate-400 font-bold uppercase block mb-1">Final Audited UC</span>
+                  {project.finalUC ? (
+                    <div className="flex items-center justify-between p-2 bg-amber-50/50 dark:bg-amber-950/10 rounded-lg border border-amber-100/50 dark:border-amber-950/40 text-xs">
+                      <div className="flex flex-col truncate mr-2">
+                        <span className="font-bold text-slate-800 dark:text-zinc-200">Period: {project.finalUC.period}</span>
+                        <span className="text-[10px] text-slate-400 truncate max-w-[180px] font-mono">{project.finalUC.fileName}</span>
+                      </div>
+                      <Button 
+                        type="primary" 
+                        size="small" 
+                        icon={<DownloadOutlined />} 
+                        className="text-[10px] h-6 px-2.5 rounded-md font-extrabold border-0 bg-amber-600 hover:bg-amber-500"
+                        onClick={() => handleDownloadBase64File(project.finalUC?.fileName || 'final_uc.pdf', project.finalUC?.fileData || '')}
+                      >
+                        UC
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-slate-400 italic block pl-1">Final Audited UC not uploaded yet</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Scientific Reports */}
+            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-2">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">
+                🏆 Final Project Report Document
+              </span>
+              {project.finalReport ? (
+                <div className="flex items-center justify-between p-2 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-lg border border-emerald-100/50 dark:border-emerald-950/40 text-xs">
+                  <div className="flex items-center gap-2 truncate mr-2">
+                    <FilePdfOutlined className="text-emerald-600 text-base" />
+                    <div className="flex flex-col truncate">
+                      <span className="font-bold text-slate-800 dark:text-zinc-200 truncate max-w-[180px]">{project.finalReport.title || 'Final Report'}</span>
+                      <span className="text-[9px] text-slate-400 truncate max-w-[150px] font-mono">{project.finalReport.fileName}</span>
+                    </div>
+                  </div>
+                  <Button 
+                    type="primary" 
+                    size="small" 
+                    icon={<DownloadOutlined />} 
+                    className="text-[10px] h-6 px-2.5 rounded-md font-extrabold border-0 bg-emerald-600 hover:bg-emerald-500"
+                    onClick={() => handleDownloadBase64File(project.finalReport?.fileName || 'final_report.pdf', project.finalReport?.fileData || '')}
+                  >
+                    Report
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-[11px] text-slate-400 italic block pl-1">No Final scientific report uploaded yet</span>
+              )}
+            </div>
+
+            {/* Associated Project Staff */}
+            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-2">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block flex justify-between items-center">
+                <span><TeamOutlined className="mr-1" /> Associated Project Staff ({assignedStaff.length})</span>
+                <Badge count={assignedStaff.length} color="#6366F1" />
+              </span>
+              {assignedStaff.length > 0 ? (
+                <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                  {assignedStaff.map(staff => (
+                    <div key={staff.id} className="p-2 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800 text-xs flex justify-between items-center">
+                      <span className="font-bold text-slate-700 dark:text-zinc-300">{staff.name}</span>
+                      <Tag color="cyan" className="m-0 text-[10px] font-medium">{staff.designation}</Tag>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-[11px] text-slate-400 italic block pl-1">No staff appointed to this project</span>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
+  const onExpandRow = (expanded: boolean, record: Project) => {
+    setExpandedRowKeys(expanded ? [record.id] : []);
+  };
+
   return (
     <div className="space-y-6">
       {/* Search and Filters Header */}
@@ -136,10 +334,10 @@ export function PublicProjectsView({
             </div>
             <div>
               <span className="text-xs text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-widest block">EXTRAMURAL RESEARCH & GRANTS</span>
-              <h2 className="text-lg font-black text-slate-800 dark:text-zinc-100 m-0">Projects Ledger & Documents</h2>
+              <h2 className="text-lg font-black text-slate-800 dark:text-zinc-100 m-0">Projects Ledger</h2>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
             <Input 
               placeholder="Search project code, PI, or scientific title..." 
               prefix={<SearchOutlined className="text-slate-400" />}
@@ -167,351 +365,48 @@ export function PublicProjectsView({
               className="rounded-lg h-10 w-full sm:w-36"
               options={[
                 { value: 'All', label: 'All Funding' },
-                { value: 'ICMR', label: 'ICMR Funded' },
-                { value: 'Non-ICMR', label: 'Non-ICMR' },
-                { value: 'International', label: 'International' }
+                { value: 'Intramural', label: 'Intramural' },
+                { value: 'Extramural', label: 'Extramural' },
+                { value: 'ICMR', label: 'ICMR' },
+                { value: 'Other', label: 'Other' },
+                { value: 'NHRP', label: 'NHRP' },
               ]}
             />
           </div>
         </div>
       </Card>
 
-      {/* Main projects grid/table */}
       <Card 
+        title={
+          <div className="py-1">
+            <span className="text-xs text-slate-400 uppercase font-bold tracking-wider block font-sans">RESEARCH PROJECTS LIST</span>
+            <span className="text-sm font-extrabold text-slate-800 dark:text-zinc-200">📂 Extramural Projects (Click any row to expand documents & certificates)</span>
+          </div>
+        }
         variant="borderless" 
         className="shadow-sm rounded-xl overflow-hidden border border-slate-100 dark:border-zinc-800"
       >
-        <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider mb-3 px-1">
-          💡 Pro tip: Click any row to view full project documents, reports, and utilization certificates.
-        </div>
         <Table 
           columns={getProjectColumns()} 
           dataSource={filteredData} 
-          pagination={{ pageSize: 8 }} 
+          pagination={{ 
+            pageSizeOptions: ['10', '25', '50', '100'],
+            showSizeChanger: true,
+            defaultPageSize: 10,
+            showTotal: (total) => `Total ${total} projects`
+          }} 
           size="middle" 
           rowKey="id" 
           scroll={{ x: 'max-content' }}
-          onRow={(record) => ({
-            onClick: (e: any) => {
-              if (e.target.closest('.ant-btn') || e.target.closest('.ant-space')) return;
-              setSelectedProject(selectedProject?.id === record.id ? null : record);
-            },
-            className: `cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-all duration-200 ${selectedProject?.id === record.id ? 'bg-blue-50/50 dark:bg-blue-950/20 border-l-4 border-blue-500 font-semibold' : ''}`
-          })}
+          expandable={{
+            expandedRowRender: renderExpandedRow,
+            expandRowByClick: true,
+            expandedRowKeys,
+            onExpand: onExpandRow
+          }}
+          className="responsive-table-expanded"
         />
       </Card>
-
-      {/* Selected Project Drawer / Details panel */}
-      {selectedProject && (
-        <div className="p-6 bg-white dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800 shadow-sm animate-fadeIn">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 border-b border-slate-100 dark:border-zinc-800 pb-3">
-            <div>
-              <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest block">Project Deep-Dive Documentation</span>
-              <h3 className="text-base font-black text-slate-800 dark:text-zinc-100 flex flex-wrap items-center gap-2">
-                📂 {selectedProject.name} 
-                <Tag color="blue" className="text-xs uppercase font-extrabold rounded-md">{selectedProject.shortName}</Tag>
-              </h3>
-            </div>
-            <Button size="small" danger type="dashed" onClick={() => setSelectedProject(null)} className="rounded-lg">Close Details</Button>
-          </div>
-
-          <Row gutter={[24, 24]}>
-            {/* Left Col: Project Metadata */}
-            <Col xs={24} md={12} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-slate-50 dark:bg-zinc-950 rounded-lg border border-slate-100 dark:border-zinc-900">
-                  <span className="text-[10px] text-slate-400 font-bold block">FUNDING SCHEME</span>
-                  <span className="text-xs font-black text-slate-700 dark:text-zinc-300">{selectedProject.type} Scheme</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-zinc-950 rounded-lg border border-slate-100 dark:border-zinc-900">
-                  <span className="text-[10px] text-slate-400 font-bold block">FINANCIAL OUTLAY</span>
-                  <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">₹{(selectedProject.budget || 0).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-zinc-950 rounded-lg border border-slate-100 dark:border-zinc-900">
-                  <span className="text-[10px] text-slate-400 font-bold block">COMMENCEMENT DATE</span>
-                  <span className="text-xs font-black text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <CalendarOutlined className="text-slate-400" /> {selectedProject.startDate}
-                  </span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-zinc-950 rounded-lg border border-slate-100 dark:border-zinc-900">
-                  <span className="text-[10px] text-slate-400 font-bold block">SCHEDULED END DATE</span>
-                  <span className="text-xs font-black text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-                    <CalendarOutlined className="text-slate-400" /> {selectedProject.endDate}
-                  </span>
-                </div>
-              </div>
-
-              {/* Progress Bar representation */}
-              <div className="p-4 bg-slate-50/50 dark:bg-zinc-950/40 rounded-xl border border-slate-100 dark:border-zinc-900/60">
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Project Lifecycle Completion</span>
-                  <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                    {selectedProject.pendingDays && selectedProject.durationDays ? (
-                      `${Math.max(0, Math.round(((selectedProject.durationDays - selectedProject.pendingDays) / selectedProject.durationDays) * 100))}%`
-                    ) : '0%'}
-                  </span>
-                </div>
-                {selectedProject.pendingDays && selectedProject.durationDays ? (
-                  <Progress 
-                    percent={Math.max(0, Math.min(100, Math.round(((selectedProject.durationDays - selectedProject.pendingDays) / selectedProject.durationDays) * 100)))} 
-                    strokeColor={{ '0%': '#10B981', '100%': '#3B82F6' }}
-                    showInfo={false}
-                    className="m-0"
-                  />
-                ) : <Progress percent={0} showInfo={false} />}
-                <div className="flex justify-between items-center mt-2 text-[10px] text-slate-400">
-                  <span>Started: {selectedProject.startDate}</span>
-                  <span>{selectedProject.pendingDays || 0} days remaining</span>
-                </div>
-              </div>
-            </Col>
-
-            {/* Right Col: Documents, reports, UCs */}
-            <Col xs={24} md={12} className="space-y-4">
-              <Card 
-                size="small" 
-                title={<span className="text-xs font-black text-slate-800 dark:text-zinc-200">📋 Official Project Utilization Certificates (UCs)</span>}
-                variant="borderless"
-                className="bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-100 dark:border-zinc-900"
-              >
-                <div className="space-y-3">
-                  {/* Provisional UCs */}
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-extrabold uppercase block mb-1">Provisional Utilization Certificates</span>
-                    {selectedProject.provisionalUCs && selectedProject.provisionalUCs.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {selectedProject.provisionalUCs.map((uc, idx) => (
-                          <div key={uc.id || idx} className="flex items-center justify-between p-2 bg-white dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800 text-xs">
-                            <span className="font-bold text-slate-700 dark:text-zinc-300 truncate max-w-[130px]" title={uc.period}>📅 {uc.period}</span>
-                            <Button 
-                              type="primary" 
-                              size="small" 
-                              icon={<DownloadOutlined />} 
-                              className="text-[10px] h-6 px-2.5 rounded-md font-extrabold border-0 bg-blue-600 hover:bg-blue-500"
-                              onClick={() => handleDownloadBase64File(uc.fileName, uc.fileData)}
-                            >
-                              Download PDF
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400 dark:text-zinc-500 italic block">No Provisional UCs uploaded yet</span>
-                    )}
-                  </div>
-
-                  {/* Final UC */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-zinc-900">
-                    <span className="text-[10px] text-slate-400 font-extrabold uppercase block mb-1">Final Audited Utilization Certificate</span>
-                    {selectedProject.finalUC ? (
-                      <div className="flex items-center justify-between p-2.5 bg-amber-50/50 dark:bg-amber-950/10 rounded-lg border border-amber-100/50 dark:border-amber-950/40 text-xs">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-800 dark:text-zinc-200">Period: {selectedProject.finalUC.period}</span>
-                          <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono truncate max-w-[180px]">{selectedProject.finalUC.fileName}</span>
-                        </div>
-                        <Button 
-                          type="primary" 
-                          size="small" 
-                          icon={<DownloadOutlined />} 
-                          className="text-[10px] h-7 px-3 rounded-md font-extrabold border-0 bg-amber-600 hover:bg-amber-500"
-                          onClick={() => handleDownloadBase64File(selectedProject.finalUC?.fileName || 'final_uc.pdf', selectedProject.finalUC?.fileData || '')}
-                        >
-                          Download Final UC
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400 dark:text-zinc-500 italic block">Final UC has not been uploaded by the PI yet</span>
-                    )}
-                  </div>
-                </div>
-              </Card>
-
-              {/* Final Project Report Section */}
-              <Card 
-                size="small" 
-                title={<span className="text-xs font-black text-slate-800 dark:text-zinc-200">🏆 Final Project Report Document</span>}
-                variant="borderless"
-                className="bg-slate-50 dark:bg-zinc-950 rounded-xl border border-slate-100 dark:border-zinc-900"
-              >
-                {selectedProject.finalReport ? (
-                  <div className="flex items-center justify-between p-3 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-lg border border-emerald-100/50 dark:border-emerald-950/40 text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 rounded-lg flex items-center justify-center">
-                        <FilePdfOutlined className="text-lg" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-extrabold text-slate-800 dark:text-zinc-200 truncate max-w-[200px]" title={selectedProject.finalReport.title}>
-                          {selectedProject.finalReport.title || 'Final Scientific Report'}
-                        </span>
-                        <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono truncate max-w-[150px]">{selectedProject.finalReport.fileName}</span>
-                      </div>
-                    </div>
-                    <Button 
-                      type="primary" 
-                      size="small" 
-                      icon={<DownloadOutlined />} 
-                      className="text-[10px] h-8 px-3.5 rounded-lg font-extrabold border-0 bg-emerald-600 hover:bg-emerald-500"
-                      onClick={() => handleDownloadBase64File(selectedProject.finalReport?.fileName || 'final_report.pdf', selectedProject.finalReport?.fileData || '')}
-                    >
-                      Download Report
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-center py-4 bg-white dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800">
-                    <span className="text-xs text-slate-400 dark:text-zinc-500 italic block">No Final Project Report uploaded</span>
-                  </div>
-                )}
-              </Card>
-            </Col>
-          </Row>
-
-          {/* Associated Project Staff Section */}
-          <div className="mt-6 pt-6 border-t border-slate-100 dark:border-zinc-800">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className="p-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-lg flex items-center justify-center">
-                  <UserOutlined className="text-base" />
-                </span>
-                <div>
-                  <h4 className="text-sm font-black text-slate-800 dark:text-zinc-200 m-0">Associated Project Staff</h4>
-                  <p className="text-[10px] text-slate-400 m-0">List of personnel appointed or working under this project</p>
-                </div>
-              </div>
-              <Badge 
-                count={(projectStaff || []).filter(ps => ps.projectId === selectedProject.id).length} 
-                showZero 
-                className="font-bold text-xs" 
-                color="#6366F1" 
-              />
-            </div>
-
-            {(projectStaff || []).filter(ps => ps.projectId === selectedProject.id).length > 0 ? (
-              <Table
-                size="small"
-                pagination={{ pageSize: 5 }}
-                dataSource={(projectStaff || []).filter(ps => ps.projectId === selectedProject.id)}
-                rowKey="id"
-                scroll={{ x: 'max-content' }}
-                columns={[
-                  {
-                    title: 'Employee Code',
-                    dataIndex: 'employeeCode',
-                    key: 'employeeCode',
-                    className: 'font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400'
-                  },
-                  {
-                    title: 'Name',
-                    dataIndex: 'name',
-                    key: 'name',
-                    className: 'font-bold text-slate-800 dark:text-zinc-200'
-                  },
-                  {
-                    title: 'Designation',
-                    dataIndex: 'designation',
-                    key: 'designation',
-                    className: 'font-medium text-slate-600 dark:text-zinc-400'
-                  },
-                  {
-                    title: 'Date of Joining',
-                    dataIndex: 'doj',
-                    key: 'doj',
-                    render: (date: string) => <span className="text-xs text-slate-500 dark:text-zinc-500">{date || 'N/A'}</span>
-                  },
-                  {
-                    title: 'Category',
-                    dataIndex: 'category',
-                    key: 'category',
-                    render: (cat: string) => <Tag className="rounded-md font-semibold text-[10px] px-1.5 py-0 bg-slate-100 text-slate-700 dark:bg-zinc-800 dark:text-zinc-300">{cat || 'UR'}</Tag>
-                  },
-                  {
-                    title: 'ICMR Experience & Red Flag Status',
-                    key: 'icmrExpLimit',
-                    render: (_: any, rec: ProjectStaff) => {
-                      const status = calculateIcmrTenureStatus(rec, selectedProject);
-                      
-                      return (
-                        <div className={`p-2 rounded-lg border flex flex-col gap-1 text-xs max-w-xs ${
-                          status.isRedFlag 
-                            ? 'bg-red-50/80 border-red-200 text-red-900 dark:bg-red-950/20 dark:border-red-900/40 dark:text-red-200' 
-                            : 'bg-slate-50 border-slate-200 text-slate-800 dark:bg-zinc-800/40 dark:border-zinc-800 dark:text-zinc-300'
-                        }`}>
-                          <div className="flex flex-col gap-0.5">
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">Prev ICMR Exp:</span>
-                              <span className="font-mono font-bold text-slate-700 dark:text-zinc-200">{formatYMD(status.prevIcmrYMD)}</span>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-[10px] font-semibold text-slate-500 dark:text-zinc-400">Current Exp:</span>
-                              <span className="font-mono font-bold text-slate-700 dark:text-zinc-200">{formatYMD(status.currentIcmrYMD)}</span>
-                            </div>
-                            <div className="border-t border-dashed border-slate-300/60 dark:border-zinc-700/60 my-0.5" />
-                            <div className="flex justify-between gap-4 font-semibold">
-                              <span className="text-[10px] text-slate-600 dark:text-zinc-300">Total ICMR EXP:</span>
-                              <span className="font-mono text-blue-600 dark:text-blue-400 font-extrabold">{formatYMD(status.totalIcmrYMD)}</span>
-                            </div>
-                            <div className="flex justify-between gap-4 text-[10px] text-slate-500 dark:text-zinc-400">
-                              <span>Cumulative Mths (ICMR+Non-ICMR):</span>
-                              <span className="font-mono font-semibold">{status.cumulativeTotalMonths.toFixed(1)} mths</span>
-                            </div>
-                          </div>
-                          
-                          <div className="border-t border-dashed border-slate-300/60 dark:border-zinc-700/60 my-0.5" />
-                          
-                          {status.isRedFlag ? (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-black uppercase text-red-600 dark:text-red-400 tracking-wider flex items-center gap-1">
-                                🚨 RED FLAG LIMIT WARNING
-                              </span>
-                              <span className="text-[11px] font-bold text-red-700 dark:text-red-300">
-                                {status.remainingText} (Cut-off: {status.cutOffDateStr})
-                              </span>
-                              <span className="text-[9px] text-red-500/90 dark:text-red-400/80">
-                                Based on: {status.cutOffReason}
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider">
-                                ✅ Tenure Status Stable
-                              </span>
-                              <span className="text-[10px] font-mono text-slate-600 dark:text-zinc-400">
-                                {status.remainingText} until Cut-off ({status.cutOffDateStr})
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                  },
-                  {
-                    title: 'Qualification',
-                    dataIndex: 'educationalQualification',
-                    key: 'educationalQualification',
-                    className: 'text-xs text-slate-500 dark:text-zinc-400'
-                  },
-                  {
-                    title: 'Status',
-                    dataIndex: 'status',
-                    key: 'status',
-                    render: (s: string) => (
-                      <Tag 
-                        color={s === 'Active' ? 'success' : 'default'} 
-                        className="font-bold text-[10px] uppercase rounded-md tracking-wider px-2 py-0"
-                      >
-                        {s}
-                      </Tag>
-                    )
-                  }
-                ]}
-              />
-            ) : (
-              <div className="text-center py-8 bg-slate-50/50 dark:bg-zinc-950/20 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
-                <Empty description={<span className="text-xs text-slate-400">No project staff currently assigned to this project</span>} image={Empty.PRESENTED_IMAGE_SIMPLE} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
