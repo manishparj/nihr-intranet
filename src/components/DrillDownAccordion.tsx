@@ -623,7 +623,7 @@ export function ProjectDrillDown({
                   <div className="flex items-center gap-2 text-xs">
                     <Avatar src={piScientist.photoUrl} icon={<UserOutlined />} className="bg-blue-600" />
                     <div>
-                      <strong className="text-slate-800 dark:text-zinc-200">Dr. {piScientist.name}</strong>
+                      <strong className="text-slate-800 dark:text-zinc-200">{piScientist.name}</strong>
                       <span className="block text-[10px] text-slate-400">{piScientist.designation} • {piScientist.employeeCode}</span>
                     </div>
                   </div>
@@ -880,7 +880,7 @@ export function ProjectDrillDown({
                         <div className="space-y-1">
                           <div>• Qualification: <strong className="text-slate-700 dark:text-zinc-300">{nestedSelectedStaff.educationalQualification || 'Not Registered'}</strong></div>
                           <div>• Linked Project: <strong className="text-blue-600 dark:text-blue-400">{project.shortName}</strong></div>
-                          <div>• Principal Investigator: <strong className="text-slate-700 dark:text-zinc-300">Dr. {piScientist?.name || 'N/A'}</strong></div>
+                          <div>• Principal Investigator: <strong className="text-slate-700 dark:text-zinc-300">{piScientist?.name || 'N/A'}</strong></div>
                         </div>
                       </div>
 
@@ -1028,7 +1028,7 @@ export function ProjectStaffDrillDown({
                 </div>
                 <div className="flex justify-between py-1.5">
                   <span className="text-slate-400 font-medium">Principal Investigator:</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{piScientist ? `Dr. ${piScientist.name}` : '-'}</span>
+                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{piScientist ? `${piScientist.name}` : '-'}</span>
                 </div>
               </div>
             </div>
