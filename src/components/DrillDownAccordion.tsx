@@ -123,7 +123,7 @@ export function ScientistDrillDown({
           <div>
             <span className="text-[10px] text-blue-500 font-bold uppercase tracking-widest block">Drill-Down Explorer</span>
             <h3 className="text-base font-black text-slate-800 dark:text-zinc-100 m-0 flex items-center gap-2">
-              Dr. {scientist.name}
+              {scientist.name}
               <Tag color="blue" className="text-[10px] uppercase font-bold m-0">{scientist.employeeCode}</Tag>
             </h3>
           </div>

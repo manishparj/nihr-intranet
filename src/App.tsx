@@ -34,8 +34,8 @@ import { PublicProjectStaffView } from './components/PublicProjectStaffView';
 import { PublicPermanentStaffView } from './components/PublicPermanentStaffView';
 import { PublicYPConsultantsView } from './components/PublicYPConsultantsView';
 import { OutsourcingPortal } from './components/OutsourcingPortal';
-import { calculateIcmrTenureStatus, calculateYPConsultantTenureStatus } from './utils/experience';
 import { StaffDetailModal } from './components/StaffDetailModal';
+import { calculateIcmrTenureStatus, calculateYPConsultantTenureStatus } from './utils/experience';
 
 const { Header, Content, Footer, Sider } = Layout;
 
@@ -564,8 +564,13 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
       // If authenticated, also fetch admins list and pending project staff registrations
       if (localStorage.getItem('nihr_token')) {
-        const [adminProfiles, pendingRegistrations, pendingYpRegistrations] = await Promise.all([
-          apiService.getAdmins(),
+        let adminProfiles: any[] = [];
+        try {
+          adminProfiles = await apiService.getAdmins();
+        } catch (adminErr) {
+          console.warn('Admins list restricted to primary admin.');
+        }
+        const [pendingRegistrations, pendingYpRegistrations] = await Promise.all([
           apiService.getPendingProjectStaff(),
           apiService.getPendingYPConsultants()
         ]);
@@ -589,8 +594,16 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         setCurrentAdmin(admin);
         setIsAuthenticated(true);
         setCurrentKey('admin-dashboard'); // Redirect to admin panel
-        const adminProfiles = await apiService.getAdmins();
-        setAdmins(adminProfiles);
+        if (admin.id === 'admin-1') {
+          try {
+            const adminProfiles = await apiService.getAdmins();
+            setAdmins(adminProfiles);
+          } catch (adminErr) {
+            console.warn('Admins list restricted to primary admin.');
+          }
+        } else {
+          setAdmins([]);
+        }
       } catch (e) {
         localStorage.removeItem('nihr_token');
         setIsAuthenticated(false);
@@ -704,9 +717,17 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       setShowLoginModal(false);
       setCurrentKey('admin-dashboard');
       message.success(`Welcome back, ${response.admin.name}!`);
-      // Reload admin details
-      const adminProfiles = await apiService.getAdmins();
-      setAdmins(adminProfiles);
+      // Reload admin details only if primary super admin (admin-1)
+      if (response.admin.id === 'admin-1') {
+        try {
+          const adminProfiles = await apiService.getAdmins();
+          setAdmins(adminProfiles);
+        } catch (adminErr) {
+          console.warn('Admins list restricted to primary admin.');
+        }
+      } else {
+        setAdmins([]);
+      }
     } catch (error: any) {
       message.error(error.response?.data?.error || 'Invalid credentials or incorrect Captcha.');
       loadCaptcha();
@@ -1095,6 +1116,36 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         <Popconfirm title="Delete Form?" onConfirm={() => handleDelete('form', rec.id)}>
           <Button type="text" size="small" danger icon={<DeleteOutlined />} />
         </Popconfirm>
+      )
+    }] : [])
+  ];
+
+  const getTickerColumns = () => [
+    { title: 'Ticker News / Bulletin Details', dataIndex: 'title', key: 'title', width: 450, className: 'font-semibold text-xs md:text-sm text-slate-800 dark:text-zinc-100' },
+    {
+      title: 'Attachment',
+      key: 'document',
+      render: (_: any, rec: Announcement) => rec.fileName ? (
+        <Button 
+          type="link" 
+          icon={<FilePdfOutlined />} 
+          onClick={() => handleDownloadBase64File(rec.fileName!, rec.fileData!)}
+        >
+          {rec.fileName}
+        </Button>
+      ) : <span className="text-xs text-slate-400">-</span>
+    },
+    ...(isAuthenticated ? [{
+      title: 'Actions',
+      key: 'actions',
+      width: 120,
+      render: (_: any, rec: Announcement) => (
+        <Space size="middle">
+          <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setEditRecord(rec); setActiveModal('announcement'); }} />
+          <Popconfirm title="Delete Ticker?" onConfirm={() => handleDelete('announcement', rec.id)}>
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
       )
     }] : [])
   ];
@@ -1783,6 +1834,11 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       ];
       dataSource = events;
       modalType = 'event';
+    } else if (currentKey === 'admin-tickers') {
+      title = '📢 Official Board Ticker News & Bulletins';
+      columns = getTickerColumns();
+      dataSource = announcements;
+      modalType = 'announcement';
     } else if (currentKey === 'admin-accounts') {
       title = '🔐 Super Admin Accounts Management';
       columns = [
@@ -1909,7 +1965,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 <span>Environment: Production</span>
                 <span>Last Data Sync: {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
               </div>
-              <div>National Institute for Health Research © 2026</div>
+              <div>National Institute of Health Research © 2026</div>
             </Footer>
           </Layout>
         </Layout>
@@ -2117,14 +2173,26 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
           {activeModal === 'announcement' && (
             <Formik
-              initialValues={{ title: '', ...editRecord }}
+              initialValues={{ title: '', fileName: '', fileData: '', ...editRecord }}
               onSubmit={(v) => handleCreateOrUpdate('announcement', v)}
             >
-              {({ isSubmitting }) => (
+              {({ isSubmitting, setFieldValue, values }) => (
                 <Form className="space-y-4">
                   <div>
                     <label className="text-xs font-semibold block mb-1">Announcement Title / Bulletin</label>
                     <Field as={Input.TextArea} rows={3} name="title" required placeholder="Type the announcement bulletin details..." />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold block mb-1">Optional Document Attachment (PDF/Word/Image)</label>
+                    <input 
+                      type="file" 
+                      accept=".pdf,.doc,.docx,.jpg,.png" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleDocFileUpload(file, setFieldValue);
+                      }} 
+                    />
+                    {values.fileName && <div className="text-xs text-green-600 mt-2 font-bold">✔️ Loaded: {values.fileName}</div>}
                   </div>
                   <Divider className="my-2" />
                   <div className="flex justify-end gap-2">

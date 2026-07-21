@@ -5,7 +5,7 @@ import {
   CustomerServiceOutlined, HomeOutlined, MenuOutlined, LoginOutlined, 
   LogoutOutlined, BulbOutlined, BulbFilled, AppstoreOutlined, 
   ProjectOutlined, SolutionOutlined, FilePdfOutlined, CalendarOutlined, 
-  SettingOutlined, KeyOutlined, SafetyCertificateOutlined
+  SettingOutlined, KeyOutlined, SafetyCertificateOutlined, NotificationOutlined
 } from '@ant-design/icons';
 import { VisibilityConfig } from '../../types';
 
@@ -77,7 +77,8 @@ export function AppHeader({
         children: [
           { key: 'admin-circulars', icon: <FilePdfOutlined />, label: 'Office Circulars' },
           { key: 'admin-forms', icon: <FilePdfOutlined />, label: 'Office Forms' },
-          { key: 'admin-events', icon: <CalendarOutlined />, label: 'Seminars & Events' }
+          { key: 'admin-events', icon: <CalendarOutlined />, label: 'Seminars & Events' },
+          { key: 'admin-tickers', icon: <NotificationOutlined />, label: 'Board Tickers' }
         ]
       },
       { key: 'admin-visibility', icon: <SettingOutlined />, label: 'Visibility' },

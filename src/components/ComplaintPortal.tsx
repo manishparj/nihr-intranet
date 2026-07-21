@@ -732,14 +732,6 @@ export const ComplaintPortal: React.FC = () => {
                           Login to Department Desk
                         </Button>
                       </Form>
-                      <Divider className="my-4" />
-                      <div className="bg-slate-50 dark:bg-zinc-950 p-3 rounded-lg border border-slate-100 text-[10px] text-slate-500">
-                        <strong>📌 Seeded Super User Login Details for evaluation:</strong>
-                        <ul className="list-disc list-inside mt-1.5 space-y-1">
-                          <li>IT Department: <code>it_super1@nihr.res.in</code> (pass: <code>admin</code>)</li>
-                          <li>Maintenance Dept: <code>maint_super1@nihr.res.in</code> (pass: <code>admin</code>)</li>
-                        </ul>
-                      </div>
                     </Card>
                   </div>
                 ) : (
