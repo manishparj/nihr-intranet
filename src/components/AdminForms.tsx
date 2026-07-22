@@ -186,7 +186,7 @@ export const ScientistForm: React.FC<ScientistFormProps> = ({
             </Col>
 
             <Col xs={24} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo (Optional)</label>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo</label>
               <input 
                 type="file" 
                 accept="image/*" 

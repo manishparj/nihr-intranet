@@ -312,7 +312,7 @@ export const ProjectStaffForm: React.FC<ProjectStaffFormProps> = ({
               </Col>
 
               <Col xs={24} md={12}>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo (Optional)</label>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo</label>
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -342,7 +342,7 @@ export const ProjectStaffForm: React.FC<ProjectStaffFormProps> = ({
             </div>
 
             {/* Previous ICMR Exp Array */}
-            <Card size="small" title={<span className="text-xs font-bold">Previous ICMR Experience (Optional)</span>} className="mb-4">
+            <Card size="small" title={<span className="text-xs font-bold">Previous ICMR Experience</span>} className="mb-4">
               <FieldArray name="previousIcmrExperience">
                 {({ push, remove }) => (
                   <div className="space-y-2">
@@ -378,7 +378,7 @@ export const ProjectStaffForm: React.FC<ProjectStaffFormProps> = ({
             </Card>
 
             {/* Previous Non-ICMR Exp Array */}
-            <Card size="small" title={<span className="text-xs font-bold">Previous Non-ICMR Experience (Optional)</span>}>
+            <Card size="small" title={<span className="text-xs font-bold">Previous Non-ICMR Experience</span>}>
               <FieldArray name="previousNonIcmrExperience">
                 {({ push, remove }) => (
                   <div className="space-y-2">
@@ -589,7 +589,7 @@ export const PermanentStaffForm: React.FC<PermanentStaffFormProps> = ({
             </Col>
 
             <Col xs={24} md={12}>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo (Optional)</label>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo</label>
               <input 
                 type="file" 
                 accept="image/*" 
@@ -811,7 +811,7 @@ export const YPConsultantForm: React.FC<YPConsultantFormProps> = ({
               </Col>
 
               <Col xs={24} md={12}>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo (Optional)</label>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Profile Photo</label>
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -853,7 +853,7 @@ export const YPConsultantForm: React.FC<YPConsultantFormProps> = ({
             </div>
 
             {/* Previous ICMR Exp Array */}
-            <Card size="small" title={<span className="text-xs font-bold">Previous ICMR Experience (Optional)</span>} className="mb-4">
+            <Card size="small" title={<span className="text-xs font-bold">Previous ICMR Experience</span>} className="mb-4">
               <FieldArray name="previousIcmrExperience">
                 {({ push, remove }) => (
                   <div className="space-y-2">
@@ -889,7 +889,7 @@ export const YPConsultantForm: React.FC<YPConsultantFormProps> = ({
             </Card>
 
             {/* Previous Non-ICMR Exp Array */}
-            <Card size="small" title={<span className="text-xs font-bold">Previous Non-ICMR Experience (Optional)</span>}>
+            <Card size="small" title={<span className="text-xs font-bold">Previous Non-ICMR Experience</span>}>
               <FieldArray name="previousNonIcmrExperience">
                 {({ push, remove }) => (
                   <div className="space-y-2">
