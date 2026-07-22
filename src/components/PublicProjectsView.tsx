@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Card, Table, Tag, Input, Select, Badge, Progress } from 'antd';
 import {
-  ProjectOutlined, SearchOutlined, UserOutlined, TeamOutlined, FilterOutlined
+  ProjectOutlined, SearchOutlined, UserOutlined, TeamOutlined,
+  WalletOutlined, TagsOutlined, FlagOutlined, PieChartOutlined,
+  UserSwitchOutlined
 } from '@ant-design/icons';
 import { Project, Scientist, VisibilityConfig, ProjectStaff } from '../types';
 
@@ -45,193 +47,115 @@ export function PublicProjectsView({
 
   const filteredData = getFilteredProjects();
 
+  const statusTagColor = (s: string) => {
+    if (s === 'Ongoing') return 'processing';
+    if (s === 'Completed') return 'success';
+    if (s === 'Yet to Start') return 'warning';
+    return 'default';
+  };
+
   const getProjectColumns = () => [
     {
       title: 'Short Code',
       dataIndex: 'shortName',
       key: 'shortName',
+      width: 100,
+      fixed: 'left' as const,
       className: 'font-extrabold text-[#005EB8] dark:text-blue-400 whitespace-nowrap',
+      onCell: () => ({ style: { verticalAlign: 'middle' } }),
       sorter: (a: Project, b: Project) => a.shortName.localeCompare(b.shortName)
     },
     {
-      title: 'Full Scientific Name',
-      dataIndex: 'name',
-      key: 'name',
-      width: 280,
-      className: 'font-semibold text-slate-800 dark:text-zinc-200'
-    },
-    {
-      title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
-      render: (t: string) => <Tag className="rounded-md px-2 py-0.5 border-0 font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 whitespace-nowrap">{t}</Tag>
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (s: string) => {
-        let color = 'default';
-        if (s === 'Ongoing') color = 'processing';
-        if (s === 'Completed') color = 'success';
-        if (s === 'Yet to Start') color = 'warning';
-        return <Tag color={color} className="font-extrabold uppercase text-[10px] rounded-md tracking-wider px-2 py-0.5 border-0 whitespace-nowrap">{s}</Tag>;
-      }
-    },
-    {
-      title: 'Budget Allocated',
-      dataIndex: 'budget',
-      key: 'budget',
-      render: (b: number) => <span className="font-bold text-slate-700 dark:text-zinc-300 whitespace-nowrap">₹{(b || 0).toLocaleString('en-IN')}</span>,
-      sorter: (a: Project, b: Project) => a.budget - b.budget
-    },
-    {
-      title: 'Principal Investigator',
-      dataIndex: 'piId',
-      key: 'piId',
-      className: 'whitespace-nowrap',
-      render: (id: string) => {
-        const sci = scientists.find(s => s.id === id);
-        return sci ? (
-          <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-zinc-300">
-            <UserOutlined className="text-slate-400 text-xs" /> {sci.name}
-          </span>
-        ) : <span className="text-slate-400 dark:text-zinc-600 italic text-xs">Unassigned PI</span>;
-      }
-    },
-    {
-      title: 'Days Remaining',
-      dataIndex: 'pendingDays',
-      key: 'pendingDays',
-      render: (val: number) => {
-        const days = val || 0;
-        return days <= 30 ? (
-          <Tag color="error" className="font-bold rounded-md border-0 whitespace-nowrap">{days} Days</Tag>
-        ) : days <= 90 ? (
-          <Tag color="warning" className="font-bold rounded-md border-0 whitespace-nowrap">{days} Days</Tag>
-        ) : (
-          <Tag color="success" className="font-bold rounded-md border-0 whitespace-nowrap">{days} Days</Tag>
+      title: 'Project Details & Lifecycle',
+      key: 'projectDetails',
+      onCell: () => ({ style: { verticalAlign: 'middle' } }),
+      render: (_: any, p: Project) => {
+        const sci = scientists.find(s => s.id === p.piId);
+        const pct = p.pendingDays && p.durationDays
+          ? Math.max(0, Math.min(100, Math.round(((p.durationDays - p.pendingDays) / p.durationDays) * 100)))
+          : 0;
+        return (
+          <div className="bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-xl shadow-sm p-2.5 sm:p-3 w-full min-w-0">
+            <span className="font-semibold text-slate-800 dark:text-zinc-200 whitespace-normal break-words leading-snug text-xs block mb-2">
+              {p.name}
+            </span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs border-t border-slate-100 dark:border-zinc-900 pt-2">
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <TagsOutlined className="text-slate-400 text-[11px]" />
+                <span className="text-slate-400 dark:text-zinc-500 font-semibold">Type:</span>
+                <Tag className="rounded-md px-2 py-0.5 border-0 font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 whitespace-nowrap m-0">
+                  {p.type}
+                </Tag>
+              </span>
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <FlagOutlined className="text-slate-400 text-[11px]" />
+                <span className="text-slate-400 dark:text-zinc-500 font-semibold">Status:</span>
+                <Tag color={statusTagColor(p.status)} className="font-extrabold uppercase text-[9px] rounded-md tracking-wider px-2 py-0.5 border-0 whitespace-nowrap m-0">
+                  {p.status}
+                </Tag>
+              </span>
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <WalletOutlined className="text-slate-400 text-[11px]" />
+                <span className="text-slate-400 dark:text-zinc-500 font-semibold">Budget:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{(p.budget || 0).toLocaleString('en-IN')}</span>
+              </span>
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <UserOutlined className="text-slate-400 text-[11px]" />
+                <span className="text-slate-400 dark:text-zinc-500 font-semibold">PI:</span>
+                <span className="font-medium text-slate-600 dark:text-zinc-400">
+                  {sci ? sci.name : <em className="text-slate-400 dark:text-zinc-600 not-italic">Unassigned</em>}
+                </span>
+              </span>
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <UserSwitchOutlined className="text-slate-400 text-[11px]" />
+                <span className="text-slate-400 dark:text-zinc-500 font-semibold">Staff Count:</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">{(p.staffCount || 0).toLocaleString('en-IN')}</span>
+              </span>
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <PieChartOutlined className="text-slate-400 text-[11px]" />
+                <span className="text-slate-400 dark:text-zinc-500 font-semibold">Lifecycle:</span>
+                <Progress
+                  type="circle"
+                  percent={pct}
+                  size={30}
+                  strokeColor={{ '0%': '#10B981', '100%': '#3B82F6' }}
+                  strokeWidth={12}
+                  format={() => ''}
+                />
+                <span className="font-bold text-slate-700 dark:text-zinc-300">{pct}%</span>
+                <span className="text-slate-400 dark:text-zinc-500 font-mono text-[10px]">({p.pendingDays || 0}d left)</span>
+              </span>
+            </div>
+          </div>
         );
-      },
-      sorter: (a: Project, b: Project) => (a.pendingDays || 0) - (b.pendingDays || 0)
-    },
-    {
-      title: 'Staff Appointed',
-      dataIndex: 'staffCount',
-      key: 'staffCount',
-      align: 'center' as const,
-      render: (val: number) => <Badge count={val || 0} showZero className="font-bold text-[11px]" color="#4F46E5" />
+      }
     }
   ];
 
-  // Render project expanded row details (Left side details, Right side lists)
+
+  // Render project expanded row — full list of associated project staff
   const renderExpandedRow = (project: Project) => {
     const assignedStaff = projectStaff.filter(s => s.projectId === project.id);
-    const piScientist = scientists.find(s => s.id === project.piId);
-    const pct = project.pendingDays && project.durationDays
-      ? Math.max(0, Math.min(100, Math.round(((project.durationDays - project.pendingDays) / project.durationDays) * 100)))
-      : 0;
 
     return (
-      <div
-        style={{ width: 0, minWidth: '100%' }}
-        className="bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-zinc-900/60 dark:to-zinc-950/60 p-3 sm:p-5 rounded-2xl border border-slate-200/70 dark:border-zinc-800/80 m-1 sm:m-2 transition-all duration-200 shadow-inner box-border overflow-hidden"
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 min-w-0">
-
-          {/* Left Column: Specifications & Timeline Progress */}
-          <div className="space-y-4 sm:space-y-5">
-
-            {/* Financial and Timeline Info */}
-            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-3 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-zinc-900 pb-2">
-               Project Administrative Specification &  🔬 Funding &amp; Timeline
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs">
-
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Project Name</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">📂 {project.name}</span>
+      <div className="bg-gradient-to-br from-slate-50 to-slate-100/40 dark:from-zinc-900/60 dark:to-zinc-950/60 p-3 sm:p-4 rounded-xl border border-slate-200/70 dark:border-zinc-800/80 m-1 transition-all duration-200 shadow-inner box-border overflow-hidden">
+        <div className="bg-white dark:bg-zinc-950 rounded-lg border border-slate-100 dark:border-zinc-900 shadow-sm p-3 sm:p-3.5 min-w-0">
+          <span className="text-[9px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider flex justify-between items-center border-b border-slate-100 dark:border-zinc-900 pb-1.5 mb-2.5">
+            <span className="flex items-center gap-1.5"><TeamOutlined /> Associated Project Staff</span>
+            <Badge count={assignedStaff.length} showZero color="#6366F1" />
+          </span>
+          {assignedStaff.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+              {assignedStaff.map(staff => (
+                <div key={staff.id} className="px-2.5 py-1.5 bg-slate-50 dark:bg-zinc-900 rounded-md border border-slate-100 dark:border-zinc-800 text-[11px] flex justify-between items-center gap-2 hover:border-blue-200 dark:hover:border-blue-900 transition-colors min-w-0">
+                  <span className="font-bold text-slate-700 dark:text-zinc-300 truncate">{staff.name}</span>
+                  <Tag color="cyan" className="m-0 text-[9px] font-medium border-0 shrink-0 leading-4">{staff.designation}</Tag>
                 </div>
-
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Project Status</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300"> <Tag
-                  color={project.status === 'Completed' ? 'success' : project.status === 'Ongoing' ? 'processing' : 'default'}
-                  className="border-0 font-semibold"
-                >
-                  {project.status}
-                </Tag></span>
-                </div>
-
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Funding Scheme</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{project.type} Scheme</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Financial Outlay</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{(project.budget || 0).toLocaleString('en-IN')}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Commencement</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{project.startDate}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Scheduled End</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{project.endDate}</span>
-                </div>
-                <div className="col-span-2 min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Principal Investigator</span>
-                  <span className="font-bold text-slate-800 dark:text-zinc-200 truncate block">
-                    {piScientist ? `${piScientist.name}` : `ID: ${project.piId}`}
-                  </span>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="pt-2 border-t border-slate-100 dark:border-zinc-900">
-                <div className="flex justify-between items-center mb-1 text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase">
-                  <span>Project Lifecycle Completion</span>
-                  <span className="text-slate-700 dark:text-zinc-300">{pct}%</span>
-                </div>
-                <Progress
-                  percent={pct}
-                  strokeColor={{ '0%': '#10B981', '100%': '#3B82F6' }}
-                  showInfo={false}
-                  className="m-0 h-2"
-                />
-                <div className="flex justify-between items-center mt-1 text-[9px] text-slate-400 dark:text-zinc-500 font-mono">
-                  <span>Start: {project.startDate}</span>
-                  <span>{project.pendingDays || 0} days remaining</span>
-                </div>
-              </div>
+              ))}
             </div>
-          </div>
-
-          {/* Right Column: UCs, Reports & Assigned Staff list */}
-          <div className="space-y-4 sm:space-y-5">
-
-            {/* Associated Project Staff */}
-            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-2.5 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider flex justify-between items-center border-b border-slate-100 dark:border-zinc-900 pb-2">
-                <span className="flex items-center gap-1.5"><TeamOutlined /> Associated Project Staff</span>
-                <Badge count={assignedStaff.length} color="#6366F1" />
-              </span>
-              {assignedStaff.length > 0 ? (
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                  {assignedStaff.map(staff => (
-                    <div key={staff.id} className="p-2 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800 text-xs flex justify-between items-center gap-2 hover:border-blue-200 dark:hover:border-blue-900 transition-colors">
-                      <span className="font-bold text-slate-700 dark:text-zinc-300 truncate">{staff.name}</span>
-                      <Tag color="cyan" className="m-0 text-[10px] font-medium border-0 shrink-0">{staff.designation}</Tag>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-[11px] text-slate-400 dark:text-zinc-600 italic block pl-1">No staff appointed to this project</span>
-              )}
-            </div>
-          </div>
-
+          ) : (
+            <span className="text-[11px] text-slate-400 dark:text-zinc-600 italic block">No staff appointed to this project</span>
+          )}
         </div>
       </div>
     );
@@ -258,9 +182,9 @@ export function PublicProjectsView({
               <h2 className="text-base sm:text-lg font-black text-slate-800 dark:text-zinc-100 m-0 truncate">Projects Ledger</h2>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
-            <Input 
-              placeholder="Search project code, PI, or scientific title..." 
+          <div className="flex flex-col sm:flex-row gap-2.5 w-full lg:w-auto">
+            <Input
+              placeholder="Search project code, PI, or scientific title..."
               prefix={<SearchOutlined className="text-slate-400" />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}

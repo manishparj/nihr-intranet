@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { Card, Table, Tag, Button, Modal, message, Input, Select, Avatar } from 'antd';
 import {
   FileAddOutlined, SearchOutlined, UserOutlined,
-  SolutionOutlined, IdcardOutlined, HistoryOutlined, FilterOutlined
+  ProjectOutlined, ClockCircleOutlined, CalendarOutlined,
+  IdcardOutlined, MailOutlined, UserSwitchOutlined,
+  EnvironmentOutlined, ApartmentOutlined, CheckCircleOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { ProjectStaff, Project, Scientist, VisibilityConfig } from '../types';
 import {
@@ -33,7 +36,6 @@ export function PublicProjectStaffView({
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
-  const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
 
   // Filter staff
   const getFilteredStaff = () => {
@@ -59,278 +61,167 @@ export function PublicProjectStaffView({
       title: 'Temp Code',
       dataIndex: 'employeeCode',
       key: 'employeeCode',
+      width: 110,
       className: 'font-mono font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap',
+      onCell: () => ({ style: { verticalAlign: 'middle' } }),
       sorter: (a: any, b: any) => (a.employeeCode || '').localeCompare(b.employeeCode || ''),
       render: (code: string) => code || <span className="text-slate-300 dark:text-zinc-700">—</span>
     },
     {
       title: 'Staff Member',
-      dataIndex: 'name',
-      key: 'name',
-      className: 'font-semibold text-slate-800 dark:text-zinc-200',
+      key: 'staffMember',
+      onCell: () => ({ style: { verticalAlign: 'middle' } }),
       sorter: (a: any, b: any) => a.name.localeCompare(b.name),
-      render: (name: string) => (
-        <span className="flex items-center gap-2 whitespace-nowrap">
-          <Avatar
-            size={26}
-            src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`}
-            className="border border-slate-200 dark:border-zinc-800 shrink-0"
-          />
-          {name}
-        </span>
-      )
-    },
-    {
-      title: 'Designation',
-      dataIndex: 'designation',
-      key: 'designation',
-      className: 'font-medium text-slate-600 dark:text-zinc-400 whitespace-nowrap'
-    },
-    {
-      title: 'Linked Project',
-      dataIndex: 'projectId',
-      key: 'projectId',
-      render: (id: string) => {
-        const p = projects.find(proj => proj.id === id);
-        return p
-          ? <Tag color="blue" className="rounded-md font-bold border-0">{p.shortName}</Tag>
-          : <span className="text-slate-400 dark:text-zinc-600 italic text-xs">Unassigned</span>;
-      }
-    },
-    {
-      title: 'Principal Investigator',
-      dataIndex: 'scientistId',
-      key: 'scientistId',
-      className: 'whitespace-nowrap',
-      render: (id: string) => scientists.find(s => s.id === id)?.name || <span className="text-slate-300 dark:text-zinc-700">—</span>
-    },
-    {
-      title: 'Total Exp (Y-M-D)',
-      key: 'totalExpYMD',
-      render: (_: any, rec: ProjectStaff) => {
-        const expYMD = calculateStaffExperienceYMD(rec);
-        return (
-          <Tag color="cyan" className="rounded-md border-0 font-semibold" title={`${rec.totalExpMonths || 0} Months cumulative`}>
-            {formatYMD(expYMD.total)}
-          </Tag>
-        );
-      },
-      sorter: (a: any, b: any) => (a.totalExpMonths || 0) - (b.totalExpMonths || 0)
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <Tag
-          color={status === 'Active' ? 'success' : 'error'}
-          className="rounded-md font-bold border-0 px-2.5"
-        >
-          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${status === 'Active' ? 'bg-emerald-500' : 'bg-red-500'}`} />
-          {status}
-        </Tag>
-      )
-    }
-  ];
-
-  // Render expanded row details (Left side details, Right side lists/experience)
-  const renderExpandedRow = (staff: ProjectStaff) => {
-    const linkedProj = projects.find(p => p.id === staff.projectId);
-    const piScientist = scientists.find(s => s.id === staff.scientistId);
-    const tenure = calculateIcmrTenureStatus(staff, linkedProj);
-
-    return (
-      <div
-        style={{ width: 0, minWidth: '100%' }}
-        className="bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-zinc-900/60 dark:to-zinc-950/60 p-3 sm:p-5 rounded-2xl border border-slate-200/70 dark:border-zinc-800/80 m-1 sm:m-2 transition-all duration-200 shadow-inner box-border overflow-hidden"
-      >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 min-w-0">
-
-          {/* Left Column: Profile Card & Contacts & Identity */}
-          <div className="space-y-4 sm:space-y-5">
-            <div className="flex flex-col sm:flex-row items-center gap-4 bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 shadow-sm hover:shadow-md transition-shadow duration-200">
-              {staff.photoUrl ? (
+      render: (_: any, rec: ProjectStaff) => (
+        <span className="flex items-center gap-2.5 min-w-0">
+           {rec.photoUrl ? (
                 <img
-                  src={staff.photoUrl}
-                  alt={staff.name}
+                  src={rec.photoUrl}
+                  alt={rec.name}
                   className="w-20 h-20 rounded-full object-cover border-2 border-[#005EB8] shadow-sm ring-2 ring-blue-100 dark:ring-blue-950/40 shrink-0"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(staff.name);
+                    (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(rec.name);
                   }}
                 />
               ) : (
                 <Avatar
                   size={80}
-                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(staff.name)}`}
+                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(rec.name)}`}
                   className="border-2 border-[#005EB8] shadow-sm ring-2 ring-blue-100 dark:ring-blue-950/40 shrink-0"
                 />
               )}
-              <div className="text-center sm:text-left space-y-1 min-w-0">
-                <h4 className="text-base font-black text-slate-800 dark:text-zinc-100 m-0 truncate">{staff.name}</h4>
-                <p className="text-xs font-semibold text-[#005EB8] dark:text-blue-400 m-0 truncate">{staff.designation}</p>
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mt-1">
-                  <Tag color="blue" className="m-0 text-[10px] font-mono font-bold border-0">{staff.employeeCode || 'TEMP-CODE'}</Tag>
-                  <Tag color={staff.status === 'Active' ? 'success' : 'error'} className="m-0 text-[10px] font-bold border-0">{staff.status}</Tag>
-                </div>
-              </div>
-            </div>
-
-            {/* Admin Specs */}
-            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-3 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-zinc-900 pb-2">
-                <SolutionOutlined /> Project &amp; Administrative Specifications & Secure Identity Details &amp; Contacts
+          <span className="flex flex-col min-w-0 leading-tight">
+            <span className="font-semibold text-slate-800 dark:text-zinc-200 truncate">{rec.name}</span>
+            <span className="text-[11px] font-medium text-slate-400 dark:text-zinc-500 truncate">{rec.designation}</span>
+          </span>
+        </span>
+      )
+    },
+    {
+      title: 'Project & PI',
+      key: 'projectPi',
+      onCell: () => ({ style: { verticalAlign: 'middle' } }),
+      render: (_: any, rec: ProjectStaff) => {
+        const p = projects.find(proj => proj.id === rec.projectId);
+        const pi = scientists.find(s => s.id === rec.scientistId);
+        return (
+          <div className="bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-lg shadow-sm px-2.5 py-1.5 flex flex-col gap-1 min-w-0 w-fit">
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+              <ProjectOutlined className="text-slate-400 text-[11px]" />
+              <span className="text-slate-400 dark:text-zinc-500 font-semibold">Project:</span>
+              {p
+                ? <Tag color="blue" className="rounded-md font-bold border-0 m-0">{p.shortName}</Tag>
+                : <span className="text-slate-400 dark:text-zinc-600 italic">Unassigned</span>}
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+              <CalendarOutlined className="text-slate-400 text-[11px]" />
+              <span className="text-slate-400 dark:text-zinc-500 font-semibold">Start Date:</span>
+              {p
+                ? <Tag color="blue" className="rounded-md font-bold border-0 m-0">{p.startDate}</Tag>
+                : <span className="text-slate-400 dark:text-zinc-600 italic">Unassigned</span>}
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+              <CalendarOutlined className="text-slate-400 text-[11px]" />
+              <span className="text-slate-400 dark:text-zinc-500 font-semibold">End Date:</span>
+              {p
+                ? <Tag color="blue" className="rounded-md font-bold border-0 m-0">{p.endDate}</Tag>
+                : <span className="text-slate-400 dark:text-zinc-600 italic">Unassigned</span>}
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+              <UserOutlined className="text-slate-400 text-[11px]" />
+              <span className="text-slate-400 dark:text-zinc-500 font-semibold">PI:</span>
+              <span className="font-medium text-slate-600 dark:text-zinc-400 truncate">
+                {pi ? pi.name : <span className="text-slate-300 dark:text-zinc-700">—</span>}
               </span>
-              <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4 text-xs">
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Date of Joining (DOJ)</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{staff.doj || 'Not registered'}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Linked Extramural Scheme</span>
-                  <span className="font-bold text-[#005EB8] dark:text-blue-400 truncate block">📂 {linkedProj?.shortName || 'Not linked'}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Principal Investigator (PI)</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300 truncate block">{piScientist?.name || '-'}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Category</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{staff.category || 'General'}</span>
-                </div>
-                 <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Email Address</span>
-                  <span className="font-mono text-slate-700 dark:text-zinc-300 break-all">
-                    {renderMaskedField(staff.email, isAuthenticated || !!visibility?.fields.email)}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Gender</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{staff.gender || '-'}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Room Number</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{staff.roomNumber || '-'}</span>
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[10px] text-slate-400 dark:text-zinc-500 font-medium">Department Location</span>
-                  <span className="font-semibold text-slate-700 dark:text-zinc-300">{staff.departmentLocation || '-'}</span>
-                </div>
-              </div>
-            </div>
+            </span>
           </div>
-
-          {/* Right Column: Tenure Constraints & Experience Timeline Lists */}
-          <div className="space-y-4 sm:space-y-5">
-            {/* Tenure Constraints Status Assessment */}
-            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-3 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <span className="text-[10px] text-[#005EB8] dark:text-blue-400 font-black uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-zinc-900 pb-2">
-                ⏱️ ICMR Official Tenure Limits &amp; Warnings
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {/* Numbers */}
-                <div className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800 space-y-2 text-xs">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-slate-400 dark:text-zinc-500">Prior ICMR Exp:</span>
-                    <strong className="font-mono text-slate-700 dark:text-zinc-300">{formatYMD(tenure.prevIcmrYMD)}</strong>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-slate-400 dark:text-zinc-500">Current Scheme Exp:</span>
-                    <strong className="font-mono text-slate-700 dark:text-zinc-300">{formatYMD(tenure.currentIcmrYMD)}</strong>
-                  </div>
-                  <div className="border-t border-dashed border-slate-200 dark:border-zinc-800 my-1" />
-                  <div className="flex justify-between gap-2 font-bold">
-                    <span className="text-slate-600 dark:text-zinc-400">Total ICMR Experience:</span>
-                    <strong className="font-mono text-blue-600 dark:text-blue-400">{formatYMD(tenure.totalIcmrYMD)}</strong>
-                  </div>
-                  <div className="flex justify-between gap-2 text-[10px] text-slate-400 dark:text-zinc-500">
-                    <span>Cumulative Total Mths:</span>
-                    <strong className="font-mono">{tenure.cumulativeTotalMonths.toFixed(1)} mths</strong>
-                  </div>
-                </div>
-
-                {/* assessment alert */}
-                <div className={`p-4 rounded-xl border flex flex-col justify-center gap-1.5 ${
-                  tenure.isRedFlag
-                    ? 'bg-red-50/60 border-red-200 dark:bg-red-950/20 dark:border-red-900/45'
-                    : 'bg-emerald-50/50 border-emerald-100 dark:bg-emerald-950/10 dark:border-emerald-950/30'
-                }`}>
-                  {tenure.isRedFlag ? (
-                    <>
-                      <span className="text-[10px] text-red-600 dark:text-red-400 font-black uppercase tracking-wider block">🚨 Red Flag Warning</span>
-                      <span className="text-xs font-bold text-red-800 dark:text-red-300 leading-snug">
-                        {tenure.remainingText} (Cut-off: {tenure.cutOffDateStr})
-                      </span>
-                      <span className="text-[9px] text-red-500 leading-tight">Reason: {tenure.cutOffReason}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-wider block">✅ Tenure Profile Compliant</span>
-                      <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 leading-snug">
-                        {tenure.remainingText} until cut-off.
-                      </span>
-                      <span className="text-[9px] text-slate-400 dark:text-zinc-500">Scheduled cut-off: {tenure.cutOffDateStr}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Previous Experiences timelines */}
-            <div className="bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-100 dark:border-zinc-900 space-y-4 shadow-sm hover:shadow-md transition-shadow duration-200">
-              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-zinc-900 pb-2">
-                <HistoryOutlined /> Prior Professional Experience Timelines
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase block mb-1.5">ICMR Experience Logs</span>
-                  {staff.previousIcmrExperience && staff.previousIcmrExperience.length > 0 ? (
-                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                      {staff.previousIcmrExperience.map((exp: any, i: number) => (
-                        <div key={i} className="p-2 bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-lg text-xs flex justify-between gap-2 hover:border-blue-200 dark:hover:border-blue-900 transition-colors">
-                          <div className="min-w-0 flex-1">
-                            <span className="font-bold text-slate-700 dark:text-zinc-300 block truncate">{exp.designation || 'Fellow'}</span>
-                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 block truncate">{exp.institute || 'ICMR'}</span>
-                          </div>
-                          <span className="font-mono text-[9px] text-blue-600 dark:text-blue-400 font-bold self-center whitespace-nowrap">{exp.fromDate} - {exp.toDate}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-400 dark:text-zinc-600 italic block">No previous ICMR experience logs</span>
-                  )}
-                </div>
-
-                <div>
-                  <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-extrabold uppercase block mb-1.5">Non-ICMR Experience Logs</span>
-                  {staff.previousNonIcmrExperience && staff.previousNonIcmrExperience.length > 0 ? (
-                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                      {staff.previousNonIcmrExperience.map((exp: any, i: number) => (
-                        <div key={i} className="p-2 bg-slate-50 dark:bg-zinc-900 border border-slate-100 dark:border-zinc-800 rounded-lg text-xs flex justify-between gap-2 hover:border-slate-300 dark:hover:border-zinc-700 transition-colors">
-                          <div className="min-w-0 flex-1">
-                            <span className="font-bold text-slate-700 dark:text-zinc-300 block truncate">{exp.designation}</span>
-                            <span className="text-[10px] text-slate-400 dark:text-zinc-500 block truncate">{exp.institute || exp.organization}</span>
-                          </div>
-                          <span className="font-mono text-[9px] text-slate-500 dark:text-zinc-400 font-bold self-center whitespace-nowrap">{exp.fromDate} - {exp.toDate}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-xs text-slate-400 dark:text-zinc-600 italic block">No previous non-ICMR experience logs</span>
-                  )}
-                </div>
-              </div>
-            </div>
+        );
+      }
+    },
+    {
+      title: 'Experience (Y-M-D)',
+      key: 'experience',
+      onCell: () => ({ style: { verticalAlign: 'middle' } }),
+      render: (_: any, rec: ProjectStaff) => {
+        const linkedProj = projects.find(p => p.id === rec.projectId);
+        const tenure = calculateIcmrTenureStatus(rec, linkedProj);
+        return (
+          <div className="bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-lg shadow-sm px-2.5 py-1.5 flex flex-col gap-1 min-w-0 w-fit">
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+            <CalendarOutlined className="text-slate-400 text-[11px]" />
+            <span className="text-slate-400 dark:text-zinc-500 font-semibold">DOJ:</span>
+            <span className="font-medium text-slate-700 dark:text-zinc-300">{rec.doj || 'Not registered'}</span>
+          </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+              <ClockCircleOutlined className="text-slate-400 text-[11px]" />
+              <span className="text-slate-400 dark:text-zinc-500 font-semibold">Prior ICMR Exp:</span>
+              <span className="font-mono font-bold text-slate-700 dark:text-zinc-300">{formatYMD(tenure.prevIcmrYMD)}</span>
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+              <ClockCircleOutlined className="text-slate-400 text-[11px]" />
+              <span className="text-slate-400 dark:text-zinc-500 font-semibold">Current Project Exp:</span>
+              <span className="font-mono font-bold text-slate-700 dark:text-zinc-300">{formatYMD(tenure.currentIcmrYMD)}</span>
+            </span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+              <ClockCircleOutlined className="text-blue-400 text-[11px]" />
+              <span className="text-slate-400 dark:text-zinc-500 font-semibold">Total ICMR Experience:</span>
+              <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{formatYMD(tenure.totalIcmrYMD)}</span>
+            </span>
+            <span className={`flex items-center gap-1.5 whitespace-nowrap text-[11px] mt-0.5 pt-1 border-t border-slate-100 dark:border-zinc-900 ${
+              tenure.isRedFlag ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+            }`}>
+              {tenure.isRedFlag ? <ExclamationCircleOutlined /> : <CheckCircleOutlined />}
+              <span className="font-bold">{tenure.isRedFlag ? 'Tenure Cut-off Risk' : 'Tenure Profile Compliant'}</span>
+            </span>
           </div>
-
+        );
+      },
+      sorter: (a: ProjectStaff, b: ProjectStaff) => {
+        const pa = projects.find(p => p.id === a.projectId);
+        const pb = projects.find(p => p.id === b.projectId);
+        return calculateIcmrTenureStatus(a, pa).cumulativeTotalMonths - calculateIcmrTenureStatus(b, pb).cumulativeTotalMonths;
+      }
+    },
+    {
+      title: 'Additional Details',
+      key: 'additionalDetails',
+      onCell: () => ({ style: { verticalAlign: 'middle' } }),
+      render: (_: any, rec: ProjectStaff) => (
+        <div className="bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-lg shadow-sm px-2.5 py-1.5 flex flex-col gap-1 min-w-0 w-fit">
+          
+          <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+            <IdcardOutlined className="text-slate-400 text-[11px]" />
+            <span className="text-slate-400 dark:text-zinc-500 font-semibold">Category / Gender:</span>
+            <span className="font-medium text-slate-700 dark:text-zinc-300">{rec.category || 'General'} / {rec.gender || '-'}</span>
+          </span>
+          <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+            <MailOutlined className="text-slate-400 text-[11px]" />
+            <span className="text-slate-400 dark:text-zinc-500 font-semibold">Email:</span>
+            <span className="font-mono text-slate-700 dark:text-zinc-300 break-all">
+              {renderMaskedField(rec.email, isAuthenticated || !!visibility?.fields.email)}
+            </span>
+          </span>
+          <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+            <EnvironmentOutlined className="text-slate-400 text-[11px]" />
+            <span className="text-slate-400 dark:text-zinc-500 font-semibold">Room No / Dept Location:</span>
+            <span className="font-medium text-slate-700 dark:text-zinc-300">{rec.roomNumber || '-'} / {rec.departmentLocation || '-'}</span>
+          </span>
+          <span className="flex items-center gap-1.5 whitespace-nowrap text-xs pt-1 border-t border-slate-100 dark:border-zinc-900">
+            <span className={`inline-block w-1.5 h-1.5 rounded-full ${rec.status === 'Active' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+            <span className="text-slate-400 dark:text-zinc-500 font-semibold">Status:</span>
+            <Tag
+              color={rec.status === 'Active' ? 'success' : 'error'}
+              className="rounded-md font-bold border-0 m-0 text-[10px]"
+            >
+              {rec.status}
+            </Tag>
+          </span>
         </div>
-      </div>
-    );
-  };
+      )
+    }
+  ];
 
-  const onExpandRow = (expanded: boolean, record: ProjectStaff) => {
-    setExpandedRowKeys(expanded ? [record.id] : []);
-  };
 
   return (
     <>
@@ -354,8 +245,8 @@ export function PublicProjectStaffView({
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
-              <Input 
-                placeholder="Search staff, code, designation, project..." 
+              <Input
+                placeholder="Search staff, code, designation, project..."
                 prefix={<SearchOutlined className="text-slate-400" />}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -393,7 +284,7 @@ export function PublicProjectStaffView({
         <Card
           title={
             <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-zinc-300">
-              👥 Project Research Staff Profiles <span className="hidden sm:inline font-normal text-slate-400 dark:text-zinc-500">— click a row to expand full details</span>
+              👥 Project Research Staff Profiles
             </span>
           }
           variant="borderless"
@@ -424,13 +315,7 @@ export function PublicProjectStaffView({
               size="middle"
               rowKey="id"
               scroll={{ x: 'max-content' }}
-              rowClassName={() => 'hover:bg-slate-50 dark:hover:bg-zinc-900/50 transition-colors cursor-pointer'}
-              expandable={{
-                expandedRowRender: renderExpandedRow,
-                expandRowByClick: true,
-                expandedRowKeys,
-                onExpand: onExpandRow
-              }}
+              rowClassName={() => 'hover:bg-slate-50 dark:hover:bg-zinc-900/50 transition-colors'}
               className="responsive-table-expanded"
             />
           </div>
