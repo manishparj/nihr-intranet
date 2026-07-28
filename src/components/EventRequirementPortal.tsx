@@ -93,8 +93,8 @@ export const EventRequirementPortal: React.FC = () => {
   const [isSuperUser, setIsSuperUser] = useState(false);
   const [superUserToken, setSuperUserToken] = useState<string | null>(localStorage.getItem('event_mgr_token'));
   const [superUserInfo, setSuperUserInfo] = useState<any>(null);
-  const [loginEmail, setLoginEmail] = useState('aonihr@gmail.com');
-  const [loginPassword, setLoginPassword] = useState('admin');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
 
   // Admin View Data
