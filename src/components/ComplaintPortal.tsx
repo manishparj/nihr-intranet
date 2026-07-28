@@ -70,6 +70,21 @@ export const ComplaintPortal: React.FC = () => {
     return matchesStatus && matchesPriority && matchesSearch;
   });
 
+  // Consistent, human-readable date + time formatter used across the table,
+  // the public tracking view and the printed receipt.
+  const formatDateTime = (value?: string | Date) => {
+    if (!value) return 'Not available';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return 'Not available';
+    return d.toLocaleString(undefined, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const getStatusStepIndex = (status: string) => {
     switch (status) {
       case 'Draft': return 0;
@@ -135,8 +150,8 @@ export const ComplaintPortal: React.FC = () => {
             <tr><th>Grievance Description</th><td><i>${c.complaintDescriptionFull}</i></td></tr>
             <tr><th>Assigned technician</th><td>${c.assignedStaff || 'Pending Assignment'}</td></tr>
             <tr><th>Official Remark / Description</th><td><strong>${c.superUserRemark || 'No action notes added yet.'}</strong></td></tr>
-            <tr><th>Date Registered</th><td>${new Date(c.createdAt).toLocaleString()}</td></tr>
-            <tr><th>Last Updated</th><td>${new Date(c.updatedAt).toLocaleString()}</td></tr>
+            <tr><th>Application Submitted On</th><td>${formatDateTime(c.createdAt)}</td></tr>
+            <tr><th>Super User Last Action On</th><td>${formatDateTime(c.updatedAt)}</td></tr>
           </table>
           <div class="footer">
             This is an automated computer-generated receipt issued by ICMR-NIHR Intranet. For support, please contact the respective departmental superuser.
@@ -359,30 +374,33 @@ export const ComplaintPortal: React.FC = () => {
 
   return (
     <Card 
-      className="shadow-md rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-      styles={{ body: { padding: '16px' } }}
+      className="shadow-lg rounded-2xl overflow-hidden border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 w-full"
+      styles={{ body: { padding: 0 } }}
     >
-      <div className="border-b border-slate-100 dark:border-zinc-800 pb-3 mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <Title level={4} style={{ margin: 0, color: '#005EB8' }} className="flex items-center gap-2 text-base sm:text-lg">
+      <div
+        className="px-4 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+        style={{ background: 'linear-gradient(135deg, #003d7a 0%, #005EB8 55%, #0072d6 100%)' }}
+      >
+        <div className="min-w-0">
+          <Title level={4} style={{ margin: 0, color: '#fff' }} className="flex items-center gap-2 text-base sm:text-xl font-extrabold tracking-tight">
             <CustomerServiceOutlined />
-            <span>Complaint & Grievance / Task Tracker Portal</span>
+            <span className="truncate">Complaint & Grievance / Task Tracker Portal</span>
           </Title>
-          <Text className="text-xs text-slate-500">
-            Submit, track and manage institutional IT, maintenance.
-          </Text>
         </div>
         {currentSu && (
-          <Tag color="geekblue" className="px-2.5 py-1 m-0 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border-0">
-            <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-ping"></span>
+          <Tag color="gold" className="px-3 py-1.5 m-0 text-[10px] sm:text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 border-0 rounded-full shrink-0">
+            <span className="w-1.5 h-1.5 bg-green-600 rounded-full inline-block animate-ping"></span>
             {currentSu.department} Admin Console Active
           </Tag>
         )}
       </div>
 
+      <div className="p-3 sm:p-5">
       <Tabs 
         activeKey={activeTab} 
         onChange={setActiveTab}
+        size="large"
+        className="premium-tabs"
         items={[
           {
             key: 'raise',
@@ -630,9 +648,25 @@ export const ComplaintPortal: React.FC = () => {
                                   </Col>
                                 </Row>
 
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] sm:text-xs bg-slate-50 dark:bg-zinc-950/40 border border-slate-100 dark:border-zinc-800 rounded-lg px-3 py-2">
+                                  <span className="flex items-center gap-1.5 text-slate-500">
+                                    <ClockCircleOutlined className="text-blue-500" />
+                                    <strong className="text-slate-400 font-semibold">Application Submitted:</strong>
+                                    <span className="font-bold text-slate-700 dark:text-zinc-200">{formatDateTime(c.createdAt)}</span>
+                                  </span>
+                                  <span className="flex items-center gap-1.5 text-slate-500">
+                                    <SyncOutlined className="text-orange-500" />
+                                    <strong className="text-slate-400 font-semibold">Super User Last Action:</strong>
+                                    <span className="font-bold text-slate-700 dark:text-zinc-200">{formatDateTime(c.updatedAt)}</span>
+                                  </span>
+                                </div>
+
                                 <div>
                                   <strong className="text-slate-400">Detailed Grievance Description:</strong> 
-                                  <p className="text-slate-600 dark:text-zinc-400 italic mt-1 bg-slate-50 dark:bg-zinc-950 p-2.5 rounded-lg m-0 whitespace-pre-line leading-relaxed">
+                                  <p 
+                                    className="text-slate-600 dark:text-zinc-400 italic mt-1 bg-slate-50 dark:bg-zinc-950 p-2.5 rounded-lg m-0 whitespace-pre-line leading-relaxed break-words"
+                                    style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                                  >
                                     {c.complaintDescriptionFull}
                                   </p>
                                 </div>
@@ -659,7 +693,10 @@ export const ComplaintPortal: React.FC = () => {
                                     <MessageOutlined /> 
                                     <span>Super User Remark / Description Log:</span>
                                   </div>
-                                  <p className="text-slate-700 dark:text-zinc-300 font-semibold italic m-0 whitespace-pre-wrap leading-relaxed">
+                                  <p 
+                                    className="text-slate-700 dark:text-zinc-300 font-semibold italic m-0 whitespace-pre-wrap leading-relaxed break-words"
+                                    style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                                  >
                                     {c.superUserRemark || "No official action notes logged by the superuser yet. Our technical desk is currently scheduling triage."}
                                   </p>
                                 </div>
@@ -673,7 +710,7 @@ export const ComplaintPortal: React.FC = () => {
                                     </span>
                                   </div>
                                   <Space className="w-full sm:w-auto justify-end">
-                                    <span className="text-[10px] text-slate-400 mr-2">Last Updated: {new Date(c.updatedAt).toLocaleString()}</span>
+                                    <span className="text-[10px] text-slate-400 mr-2">Last Updated: {formatDateTime(c.updatedAt)}</span>
                                     <Button 
                                       type="primary" 
                                       ghost 
@@ -887,16 +924,29 @@ export const ComplaintPortal: React.FC = () => {
                             title: 'Description', 
                             dataIndex: 'complaintDescriptionFull', 
                             key: 'complaintDescriptionFull',
-                            ellipsis: true,
-                            width: 200
+                            width: 220,
+                            render: (val: string) => (
+                              <div
+                                className="text-xs text-slate-700 dark:text-zinc-300 leading-relaxed"
+                                style={{ whiteSpace: 'pre-line', overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                              >
+                                {val}
+                              </div>
+                            )
                           },
                           { 
                             title: 'Super User Remark', 
                             dataIndex: 'superUserRemark', 
                             key: 'superUserRemark',
-                            ellipsis: true,
-                            width: 180,
-                            render: (val: string) => <span className="text-xs text-blue-600 dark:text-blue-400 italic font-medium">{val || 'No remark logged'}</span>
+                            width: 200,
+                            render: (val: string) => (
+                              <div
+                                className="text-xs text-blue-600 dark:text-blue-400 italic font-medium leading-relaxed"
+                                style={{ whiteSpace: 'pre-line', overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                              >
+                                {val || 'No remark logged'}
+                              </div>
+                            )
                           },
                           { 
                             title: 'Status', 
@@ -911,6 +961,31 @@ export const ComplaintPortal: React.FC = () => {
                             key: 'assignedStaff',
                             render: (val: string) => <span className="font-semibold">{val || 'Unassigned'}</span>,
                             width: 120
+                          },
+                          {
+                            title: 'Submitted On',
+                            dataIndex: 'createdAt',
+                            key: 'createdAt',
+                            width: 150,
+                            sorter: (a: Complaint, b: Complaint) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+                            defaultSortOrder: 'descend' as const,
+                            render: (val: string) => (
+                              <span className="text-[11px] text-slate-600 dark:text-zinc-400 flex items-center gap-1 whitespace-nowrap">
+                                <ClockCircleOutlined className="text-slate-400" /> {formatDateTime(val)}
+                              </span>
+                            )
+                          },
+                          {
+                            title: 'Super User Action On',
+                            dataIndex: 'updatedAt',
+                            key: 'updatedAt',
+                            width: 150,
+                            sorter: (a: Complaint, b: Complaint) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+                            render: (val: string, c: any) => (
+                              <span className="text-[11px] text-slate-600 dark:text-zinc-400 flex items-center gap-1 whitespace-nowrap">
+                                <ClockCircleOutlined className="text-slate-400" /> {c.assignedStaff || c.superUserRemark || c.status !== 'Draft' ? formatDateTime(val) : 'Awaiting action'}
+                              </span>
+                            )
                           },
                           {
                             title: 'Actions',
@@ -999,8 +1074,17 @@ export const ComplaintPortal: React.FC = () => {
               <Descriptions.Item label={<span className="font-semibold text-xs">Grievance Category</span>}>
                 <Tag color="purple" className="font-bold">{selectedComplaint.typeOfComplaint}</Tag>
               </Descriptions.Item>
+              <Descriptions.Item label={<span className="font-semibold text-xs">Application Submitted On</span>}>
+                <span className="font-bold text-slate-700 flex items-center gap-1.5"><ClockCircleOutlined className="text-blue-500" /> {formatDateTime(selectedComplaint.createdAt)}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label={<span className="font-semibold text-xs">Super User Last Action On</span>}>
+                <span className="font-bold text-slate-700 flex items-center gap-1.5"><SyncOutlined className="text-orange-500" /> {formatDateTime(selectedComplaint.updatedAt)}</span>
+              </Descriptions.Item>
               <Descriptions.Item label={<span className="font-semibold text-xs">Description Full</span>}>
-                <p className="text-slate-700 italic bg-slate-50 dark:bg-zinc-950 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap leading-relaxed m-0 text-xs">
+                <p 
+                  className="text-slate-700 italic bg-slate-50 dark:bg-zinc-950 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap leading-relaxed m-0 text-xs break-words"
+                  style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}
+                >
                   {selectedComplaint.complaintDescriptionFull}
                 </p>
               </Descriptions.Item>
@@ -1120,6 +1204,7 @@ export const ComplaintPortal: React.FC = () => {
           </div>
         )}
       </Modal>
+      </div>
     </Card>
   );
 };
