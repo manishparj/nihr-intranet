@@ -9,7 +9,8 @@ import {
   FilePdfOutlined, PlusOutlined, DeleteOutlined, SearchOutlined, 
   CheckCircleOutlined, ClockCircleOutlined, ExclamationCircleOutlined, 
   CloseCircleOutlined, LockOutlined, FileTextOutlined, DollarOutlined,
-  SendOutlined, InfoCircleOutlined, SafetyCertificateOutlined, ReloadOutlined
+  SendOutlined, InfoCircleOutlined, SafetyCertificateOutlined, ReloadOutlined,
+  PrinterOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { apiService } from '../services/api';
@@ -134,6 +135,313 @@ export const EventRequirementPortal: React.FC = () => {
       fetchAdminRequests();
     }
   }, [superUserToken]);
+
+  const handlePrintRequest = (req: EventRequirementRequest) => {
+    const itemsRowsHtml = (req.items || []).map((item, idx) => `
+      <tr>
+        <td style="text-align: center; font-weight: bold;">${idx + 1}</td>
+        <td><strong>${item.itemName || '-'}</strong></td>
+        <td style="text-align: center;">${item.quantity || 0}</td>
+        <td style="text-align: right;">₹${(item.pricePerItem || 0).toLocaleString('en-IN')}</td>
+        <td style="text-align: right; font-weight: bold;">₹${(item.estimateTotal || 0).toLocaleString('en-IN')}</td>
+        <td>${item.remarkJustification || '-'}</td>
+      </tr>
+    `).join('');
+
+    const statusDisplay = req.status === 'Custom Status' && req.customStatusText 
+      ? req.customStatusText 
+      : req.status;
+
+    const budgetHeadDisplay = req.budgetHead === 'Other' 
+      ? (req.otherBudgetHead || 'Other') 
+      : `${req.budgetHead} Budget`;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Event Requirement Application - ${req.id}</title>
+          <style>
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              color: #0f172a;
+              margin: 0;
+              padding: 24px;
+              line-height: 1.5;
+              font-size: 13px;
+              background: #ffffff;
+            }
+            .header-table {
+              width: 100%;
+              border-bottom: 2.5px solid #1e3a8a;
+              padding-bottom: 12px;
+              margin-bottom: 18px;
+            }
+            .org-title {
+              font-size: 15px;
+              font-weight: 800;
+              color: #1e3a8a;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .org-sub {
+              font-size: 11px;
+              color: #475569;
+              margin-top: 2px;
+            }
+            .doc-title {
+              font-size: 17px;
+              font-weight: 900;
+              color: #0284c7;
+              text-align: center;
+              text-transform: uppercase;
+              background: #f0f9ff;
+              border: 1px solid #bae6fd;
+              padding: 8px 12px;
+              border-radius: 6px;
+              margin-bottom: 20px;
+              letter-spacing: 0.5px;
+            }
+            .ref-badge {
+              display: inline-block;
+              font-size: 13px;
+              font-weight: 800;
+              background: #eff6ff;
+              color: #1d4ed8;
+              padding: 5px 12px;
+              border-radius: 6px;
+              border: 1px solid #bfdbfe;
+            }
+            .section-title {
+              font-size: 12px;
+              font-weight: 800;
+              text-transform: uppercase;
+              color: #1e40af;
+              border-bottom: 1px solid #cbd5e1;
+              padding-bottom: 4px;
+              margin-top: 18px;
+              margin-bottom: 10px;
+              letter-spacing: 0.5px;
+            }
+            .info-grid {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 12px;
+            }
+            .info-grid td {
+              padding: 7px 10px;
+              vertical-align: top;
+              border: 1px solid #cbd5e1;
+              font-size: 12px;
+            }
+            .info-label {
+              font-weight: 700;
+              color: #334155;
+              width: 22%;
+              background-color: #f8fafc;
+            }
+            .info-val {
+              color: #0f172a;
+            }
+            .item-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 8px;
+              margin-bottom: 16px;
+              font-size: 12px;
+            }
+            .item-table th, .item-table td {
+              border: 1px solid #cbd5e1;
+              padding: 8px 10px;
+            }
+            .item-table th {
+              background-color: #f1f5f9;
+              font-weight: 800;
+              color: #1e293b;
+              text-align: left;
+            }
+            .total-row td {
+              background-color: #f0f9ff;
+              font-weight: 800;
+              font-size: 13px;
+              color: #0369a1;
+            }
+            .status-box {
+              background: #f8fafc;
+              border: 1px solid #cbd5e1;
+              border-left: 5px solid #2563eb;
+              padding: 12px 16px;
+              border-radius: 6px;
+              margin-top: 12px;
+            }
+            .alert-box {
+              background: #fffbeb;
+              border: 1px solid #fde68a;
+              color: #92400e;
+              padding: 10px 14px;
+              border-radius: 6px;
+              font-size: 12px;
+              margin-top: 10px;
+              margin-bottom: 12px;
+            }
+            .signatures {
+              margin-top: 45px;
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .signatures td {
+              width: 33.33%;
+              text-align: center;
+              vertical-align: bottom;
+              padding-top: 45px;
+            }
+            .sig-line {
+              border-top: 1px dashed #64748b;
+              margin: 0 12px;
+              padding-top: 6px;
+              font-weight: 700;
+              font-size: 11px;
+              color: #334155;
+            }
+            .footer {
+              margin-top: 35px;
+              padding-top: 12px;
+              border-top: 1px solid #e2e8f0;
+              text-align: center;
+              font-size: 10px;
+              color: #64748b;
+            }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td>
+                <div class="org-title">ICMR - National Institute of Health Research</div>
+                <div class="org-sub">Indian Council of Medical Research, Dept. of Health Research, Govt. of India</div>
+              </td>
+              <td style="text-align: right; vertical-align: top;">
+                <span class="ref-badge">REF: ${req.id}</span>
+              </td>
+            </tr>
+          </table>
+
+          <div class="section-title">1. Applicant Details</div>
+          <table class="info-grid">
+            <tr>
+              <td class="info-label">Applicant Name</td>
+              <td class="info-val"><strong>${req.name}</strong></td>
+              <td class="info-label">Designation</td>
+              <td class="info-val">${req.designation}</td>
+            </tr>
+            <tr>
+              <td class="info-label">Mobile Number</td>
+              <td class="info-val">${req.mobile}</td>
+              <td class="info-label">Email Address</td>
+              <td class="info-val">${req.email}</td>
+            </tr>
+            <tr>
+              <td class="info-label">Submission Date</td>
+              <td class="info-val">${req.submissionDate}</td>
+              <td class="info-label">Budget Head</td>
+              <td class="info-val"><strong>${budgetHeadDisplay}</strong></td>
+            </tr>
+          </table>
+
+          <div class="section-title">2. Event Schedule & Timeline</div>
+          <table class="info-grid">
+            <tr>
+              <td class="info-label">Event Title</td>
+              <td class="info-val" colspan="3"><strong>${req.eventTitle}</strong></td>
+            </tr>
+            <tr>
+              <td class="info-label">Event Duration</td>
+              <td class="info-val"><strong>${req.startDate}</strong> to <strong>${req.endDate}</strong> (${req.durationDays} Days)</td>
+              <td class="info-label">Advance Notice</td>
+              <td class="info-val">
+                <strong>${req.advanceDays} Days</strong> ${req.advanceDays < 25 ? '<span style="color:#b45309; font-weight:bold;">(Late Submission Notice &lt; 25 Days)</span>' : '<span style="color:#15803d; font-weight:bold;">(Standard Policy &gt;= 25 Days)</span>'}
+              </td>
+            </tr>
+          </table>
+
+          ${req.advanceDays < 25 && req.lateJustification ? `
+            <div class="alert-box">
+              <strong>The delay in submission may result in procurement outside Gem for which DHR, MoFHW seeks justification.Late Submission Justification Reason (Compulsory):</strong><br/>
+              <span style="font-style: italic; margin-top: 4px; display: block;">"${req.lateJustification}"</span>
+            </div>
+          ` : ''}
+
+          <div class="section-title">3. Itemized Requirement & Estimated Budget Statement</div>
+          <table class="item-table">
+            <thead>
+              <tr>
+                <th style="width: 35px; text-align: center;">#</th>
+                <th>Item Description / Service Required</th>
+                <th style="width: 50px; text-align: center;">Qty</th>
+                <th style="width: 110px; text-align: right;">Rate / Item (₹)</th>
+                <th style="width: 120px; text-align: right;">Estimate Total (₹)</th>
+                <th>Remarks / Justification</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRowsHtml}
+              <tr class="total-row">
+                <td colspan="4" style="text-align: right; font-weight: 800;">GRAND TOTAL ESTIMATE BUDGET:</td>
+                <td style="text-align: right; font-weight: 900;">₹${(req.totalEstimateBudget || 0).toLocaleString('en-IN')}</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+
+          ${req.additionalRemark ? `
+            <div style="margin-bottom: 14px;">
+              <strong style="color: #334155; font-size: 11px; text-transform: uppercase;">Additional Remarks</strong>
+              <div style="background: #f8fafc; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 4px; margin-top: 4px; font-size: 12px;">
+                ${req.additionalRemark}
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="section-title">4.Official Sanction Status</div>
+          <div class="status-box">
+            <table style="width:100%; border:none; border-collapse:collapse;">
+              <tr>
+                <td style="border:none; padding:0; vertical-align:middle;">
+                  <strong>Application Status:</strong> <span style="font-size: 14px; font-weight: 900; color: #1d4ed8; text-transform: uppercase;">${statusDisplay}</span>
+                </td>
+              </tr>
+            </table>
+            ${req.superUserRemarks ? `
+              <div style="margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 12px; color: #1e293b;">
+                <strong>Remarks / Sanction Notes:</strong><br/>
+                <span style="font-weight: 500;">${req.superUserRemarks}</span>
+              </div>
+            ` : ''}
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+    } else {
+      message.error("Pop-up blocked. Please allow pop-ups or use the browser's print option.");
+    }
+  };
 
   const handleItemChange = (index: number, field: keyof RequirementItem, value: any) => {
     const updated = [...items];
@@ -660,28 +968,17 @@ export const EventRequirementPortal: React.FC = () => {
               </Col>
             </Row>
 
-            {advanceDays >= 25 ? (
-              <Alert 
-                type="success"
-                showIcon
-                icon={<CheckCircleOutlined />}
-                title={`Advance submission time is ${advanceDays} days (>= 25 days). Submission duration is within standard policy limits.`}
-                className="rounded-xl border-emerald-200"
-              />
-            ) : (
+            {advanceDays < 25 && (
               <Alert 
                 type="warning"
                 showIcon
                 icon={<ExclamationCircleOutlined />}
-                title={`Advance submission time is ${advanceDays} days (< 25 days). Late submission justification is compulsory.`}
+                title={`The delay in submission may result in procurement outside Gem for which DHR, MoFHW seeks justification. So please mention your reason for delay in submission.`}
                 description={
                   <div className="mt-2">
-                    <label className="text-xs font-bold text-slate-800 dark:text-zinc-200 block mb-1">
-                      Justification Reason for Late Requirement Submission <span className="text-red-500">*</span>
-                    </label>
                     <TextArea 
                       rows={2}
-                      placeholder="Please provide urgent official reason or justification for submitting the requirement less than 25 days prior to event start date..."
+                      placeholder="Advance submission time is < 25 days. Justification Reason for Late Requirement Submission is Compulsory."
                       value={lateJustification}
                       onChange={(e) => setLateJustification(e.target.value)}
                       className="rounded-lg bg-white dark:bg-zinc-900"
@@ -845,7 +1142,7 @@ export const EventRequirementPortal: React.FC = () => {
                 </label>
                 <TextArea 
                   rows={2}
-                  placeholder="Enter any additional remarks, hall preferences, streaming or AV setup notes..."
+                  placeholder="Enter any additional remarks, hall preferences, streaming or Audio Video setup notes..."
                   value={additionalRemark}
                   onChange={(e) => setAdditionalRemark(e.target.value)}
                   className="rounded-lg"
@@ -934,8 +1231,17 @@ export const EventRequirementPortal: React.FC = () => {
                             <h3 className="text-base font-bold text-slate-800 dark:text-zinc-100 m-0 mt-1">{req.eventTitle}</h3>
                           </div>
 
-                          <div>
+                          <div className="flex items-center gap-2">
                             {renderStatusBadge(req.status, req.customStatusText)}
+                            <Button 
+                              size="small" 
+                              type="primary"
+                              icon={<PrinterOutlined />}
+                              onClick={() => handlePrintRequest(req)}
+                              className="text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700"
+                            >
+                              Print Application
+                            </Button>
                           </div>
                         </div>
 
@@ -1233,6 +1539,15 @@ export const EventRequirementPortal: React.FC = () => {
                             </Button>
                             <Button 
                               size="small" 
+                              icon={<PrinterOutlined />}
+                              onClick={() => handlePrintRequest(rec)}
+                              className="text-xs font-bold rounded-lg border-blue-300 text-blue-700 hover:bg-blue-50"
+                              title="Print Application"
+                            >
+                              Print
+                            </Button>
+                            <Button 
+                              size="small" 
                               type="primary"
                               onClick={() => openActionModal(rec)}
                               className="bg-blue-600 hover:bg-blue-500 text-xs font-bold rounded-lg"
@@ -1266,6 +1581,16 @@ export const EventRequirementPortal: React.FC = () => {
         onCancel={() => setSelectedRequest(null)}
         footer={[
           <Button key="close" onClick={() => setSelectedRequest(null)}>Close</Button>,
+          selectedRequest && (
+            <Button 
+              key="print" 
+              icon={<PrinterOutlined />} 
+              onClick={() => handlePrintRequest(selectedRequest)} 
+              className="font-bold border-blue-300 text-blue-700 hover:bg-blue-50"
+            >
+              Print Application Form
+            </Button>
+          ),
           selectedRequest && (
             <Button key="action" type="primary" onClick={() => { const req = selectedRequest; setSelectedRequest(null); openActionModal(req); }} className="bg-blue-600 font-bold">
               Update Status & Add Remarks
