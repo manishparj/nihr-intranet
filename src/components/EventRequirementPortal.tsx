@@ -374,7 +374,7 @@ export const EventRequirementPortal: React.FC = () => {
 
           ${req.advanceDays < 25 && req.lateJustification ? `
             <div class="alert-box">
-              <strong>The delay in submission may result in procurement outside Gem for which DHR, MoFHW seeks justification.Late Submission Justification Reason (Compulsory):</strong><br/>
+              <strong>The delay in submission may result in procurement outside Gem for which DHR, MoHFW seeks justification. So please mention your reason for delay in submission:</strong><br/>
               <span style="font-style: italic; margin-top: 4px; display: block;">"${req.lateJustification}"</span>
             </div>
           ` : ''}
@@ -973,7 +973,7 @@ export const EventRequirementPortal: React.FC = () => {
                 type="warning"
                 showIcon
                 icon={<ExclamationCircleOutlined />}
-                title={`The delay in submission may result in procurement outside Gem for which DHR, MoFHW seeks justification. So please mention your reason for delay in submission.`}
+                title={`The delay in submission may result in procurement outside Gem for which DHR, MoHFW seeks justification.   So please mention your reason for delay in submission.`}
                 description={
                   <div className="mt-2">
                     <TextArea 
