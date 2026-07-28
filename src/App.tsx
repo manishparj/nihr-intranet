@@ -25,6 +25,7 @@ import { DashboardOverview } from './components/DashboardOverview';
 import { ScientistForm, ProjectForm } from './components/AdminForms';
 import { ProjectStaffForm, PermanentStaffForm, YPConsultantForm } from './components/StaffForms';
 import { ComplaintPortal } from './components/ComplaintPortal';
+import { EventRequirementPortal } from './components/EventRequirementPortal';
 import { SalaryPortalView, AdminSalariesManager } from './components/SalaryPortal';
 import { AppHeader } from './components/layout/AppHeader';
 import { HomeDashboard } from './components/HomeDashboard';
@@ -1174,6 +1175,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
 
     if (currentKey === 'complaints') {
       return <ComplaintPortal />;
+    }
+
+    if (currentKey === 'event-requirements') {
+      return <EventRequirementPortal />;
     }
 
     if (currentKey === 'outsourcing') {

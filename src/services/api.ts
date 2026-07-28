@@ -413,4 +413,44 @@ export const apiService = {
     const res = await client.post<{ success: boolean }>(`/pending-yp-consultants/${id}/reject`);
     return res.data;
   },
+
+  
+  // Event / Workshop / Seminar Requirement Portal API
+  loginEventManagerSuperUser: async (data: any) => {
+    const res = await client.post<{ token: string; user: any }>('/event-requests/auth/login', data);
+    localStorage.setItem('event_mgr_token', res.data.token);
+    return res.data;
+  },
+  logoutEventManagerSuperUser: () => {
+    localStorage.removeItem('event_mgr_token');
+  },
+  submitEventRequest: async (data: any) => {
+    const res = await client.post<{ success: boolean; id: string; request: any }>('/event-requests', data);
+    return res.data;
+  },
+  trackEventRequestsByMobile: async (mobile: string) => {
+    const res = await client.get(`/event-requests/track/${encodeURIComponent(mobile)}`);
+    return res.data;
+  },
+  getEventRequests: async () => {
+    const token = localStorage.getItem('event_mgr_token');
+    const res = await client.get('/event-requests', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    return res.data;
+  },
+  updateEventRequestStatus: async (id: string, data: any) => {
+    const token = localStorage.getItem('event_mgr_token');
+    const res = await client.put(`/event-requests/${id}`, data, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    return res.data;
+  },
+  deleteEventRequest: async (id: string) => {
+    const token = localStorage.getItem('event_mgr_token');
+    const res = await client.delete(`/event-requests/${id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    return res.data;
+  },
 };

@@ -23,6 +23,7 @@ import {
   StoreSuperUser
 } from './db';
 import { ComplaintsDatabase } from './complaints_db';
+import { EventRequestsDatabase } from './event_requests_db';
 
 const router = express.Router();
 router.use(express.json({ limit: '50mb' })); // Allow larger payloads for PDF/image uploads
@@ -1901,5 +1902,200 @@ router.delete('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: Reque
   Database.set('outsourcedEmployees', filtered);
   res.json({ success: true });
 });
+
+
+// ==========================================
+// EVENT / WORKSHOP / SEMINAR REQUIREMENT PORTAL API
+// ==========================================
+
+// Event Manager Super User Login
+router.post('/event-requests/auth/login', (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+
+  const hash = crypto.createHash('sha256').update(password + 'event-mgr-salt-2026').digest('hex');
+  const superUsers = EventRequestsDatabase.get('superUsers');
+  
+  let user = superUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === hash);
+  
+  // Fallback for general super admin login (admin/admin or admin_super)
+  if (!user && (email.toLowerCase() === 'aonihr@gmail.com' || email.toLowerCase() === 'aonihr@gmail.com' || email.toLowerCase() === 'aonihr@gmail.com') && password === 'aonihr@2026') {
+    user = superUsers[0];
+  }
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid Event Manager Super User credentials.' });
+  }
+
+  const token = `event-mgr-token-${user.id}-${Date.now()}`;
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    }
+  });
+});
+
+// Submit New Event Requirement Request (Public)
+router.post('/event-requests', (req: Request, res: Response) => {
+  const {
+    name,
+    designation,
+    email,
+    mobile,
+    eventTitle,
+    budgetHead,
+    otherBudgetHead,
+    startDate,
+    endDate,
+    durationDays,
+    advanceDays,
+    submissionDate,
+    lateJustification,
+    additionalRemark,
+    budgetStatementPdf,
+    budgetStatementFileName,
+    supportingDocPdf,
+    supportingDocFileName,
+    items,
+    totalEstimateBudget
+  } = req.body;
+
+  if (!name || !designation || !email || !mobile || !eventTitle || !budgetHead || !startDate || !endDate) {
+    return res.status(400).json({ error: 'Please fill all compulsory fields.' });
+  }
+
+  if (budgetHead === 'Other' && !otherBudgetHead) {
+    return res.status(400).json({ error: 'Please specify the Other Budget Head name.' });
+  }
+
+  if (Number(advanceDays) < 25 && !lateJustification) {
+    return res.status(400).json({ error: 'Justification Reason for late Requirement submission is compulsory when advance days are less than 25.' });
+  }
+
+  // Save PDF files if base64 provided
+  let savedBudgetPdf = budgetStatementPdf;
+  if (budgetStatementPdf && budgetStatementFileName) {
+    savedBudgetPdf = saveUploadedFile(budgetStatementFileName, budgetStatementPdf, 'event_docs');
+  }
+
+  let savedSupportingPdf = supportingDocPdf;
+  if (supportingDocPdf && supportingDocFileName) {
+    savedSupportingPdf = saveUploadedFile(supportingDocFileName, supportingDocPdf, 'event_docs');
+  }
+
+  const requests = EventRequestsDatabase.get('requests');
+  const nextNumber = 1000 + requests.length + 1;
+  const newId = `EVT-2026-${nextNumber}`;
+
+  const newRequest = {
+    id: newId,
+    name,
+    designation,
+    email,
+    mobile: String(mobile).trim(),
+    eventTitle,
+    budgetHead,
+    otherBudgetHead: budgetHead === 'Other' ? otherBudgetHead : undefined,
+    startDate,
+    endDate,
+    durationDays: Number(durationDays) || 1,
+    advanceDays: Number(advanceDays) || 0,
+    submissionDate: submissionDate || new Date().toISOString().split('T')[0],
+    lateJustification: Number(advanceDays) < 25 ? lateJustification : undefined,
+    additionalRemark,
+    budgetStatementPdf: savedBudgetPdf,
+    budgetStatementFileName,
+    supportingDocPdf: savedSupportingPdf,
+    supportingDocFileName,
+    items: Array.isArray(items) ? items : [],
+    totalEstimateBudget: Number(totalEstimateBudget) || 0,
+    status: 'Pending',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  requests.unshift(newRequest as any);
+  EventRequestsDatabase.set('requests', requests);
+
+  res.status(201).json({
+    success: true,
+    message: 'Event requirement request submitted successfully.',
+    id: newId,
+    request: newRequest
+  });
+});
+
+// Track Event Requirement Requests by Mobile Number (Public)
+router.get('/event-requests/track/:mobile', (req: Request, res: Response) => {
+  const { mobile } = req.params;
+  if (!mobile) {
+    return res.status(400).json({ error: 'Mobile number is required.' });
+  }
+
+  const requests = EventRequestsDatabase.get('requests');
+  const userMobile = String(mobile).trim();
+  const results = requests.filter(r => String(r.mobile).trim() === userMobile);
+
+  res.json(results);
+});
+
+// Get All Event Requirement Requests (Event Manager Super User)
+router.get('/event-requests', (req: Request, res: Response) => {
+  const requests = EventRequestsDatabase.get('requests');
+  res.json(requests);
+});
+
+// Update Status & Remarks of Event Requirement Request (Event Manager Super User)
+router.put('/event-requests/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status, customStatusText, superUserRemarks, reviewedBy } = req.body;
+
+  const requests = EventRequestsDatabase.get('requests');
+  const index = requests.findIndex(r => r.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Event requirement request not found.' });
+  }
+
+  requests[index] = {
+    ...requests[index],
+    status: status || requests[index].status,
+    customStatusText: status === 'Custom Status' ? customStatusText : requests[index].customStatusText,
+    superUserRemarks: superUserRemarks !== undefined ? superUserRemarks : requests[index].superUserRemarks,
+    reviewedBy: reviewedBy || requests[index].reviewedBy || 'Event Manager Super User',
+    updatedAt: new Date().toISOString()
+  };
+
+  EventRequestsDatabase.set('requests', requests);
+
+  res.json({
+    success: true,
+    message: 'Request status updated successfully.',
+    request: requests[index]
+  });
+});
+
+// Delete Event Requirement Request
+router.delete('/event-requests/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const requests = EventRequestsDatabase.get('requests');
+  const filtered = requests.filter(r => r.id !== id);
+
+  if (filtered.length === requests.length) {
+    return res.status(404).json({ error: 'Request not found.' });
+  }
+
+  EventRequestsDatabase.set('requests', filtered);
+  res.json({ success: true, message: 'Request deleted successfully.' });
+});
+
+// ==========================================
+// PROJECT STAFF SALARY SLIPS SYSTEM
 
 export default router;

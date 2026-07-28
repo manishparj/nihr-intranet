@@ -48,6 +48,7 @@ export function AppHeader({
       // ...(visibility?.modules.permanentStaff ? [{ key: 'public-permanent', icon: <TeamOutlined />, label: 'Permanent Staff' }] : []),
       ...(visibility?.modules.ypConsultants ? [{ key: 'public-ypc', icon: <StarOutlined />, label: 'YP & Consultants' }] : []),
       { key: 'public-salary-portal', icon: <PrinterOutlined />, label: 'Salary Portal' },
+      { key: 'event-requirements', icon: <CalendarOutlined />, label: 'Event Requirements' },
       { key: 'outsourcing', icon: <SafetyCertificateOutlined />, label: 'Outsourced & Agencies' },
       { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Complaints Desk' }
     ];
@@ -82,6 +83,7 @@ export function AppHeader({
         ]
       },
       { key: 'admin-visibility', icon: <SettingOutlined />, label: 'Visibility' },
+       { key: 'event-requirements', icon: <CalendarOutlined />, label: 'Event Requirements' },
       { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Complaints Desk' },
       ...(currentAdmin?.id === 'admin-1' ? [{ key: 'admin-accounts', icon: <KeyOutlined />, label: 'Admin Accounts' }] : []),
       { key: 'public-dashboard', icon: <HomeOutlined />, label: 'View Public' }
