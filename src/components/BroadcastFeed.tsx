@@ -629,7 +629,14 @@ export const BroadcastFeed: React.FC<BroadcastFeedProps> = ({
                           {msg.senderName}
                         </span>
                         <span className="text-[9px] text-slate-400 dark:text-zinc-400 flex items-center gap-1">
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(msg.timestamp).toLocaleString('en-IN', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
                           {isWhatsAppTheme && (
                             <span className="text-[#34b7f1] text-[10px] font-bold">✓✓</span>
                           )}

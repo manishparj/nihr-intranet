@@ -146,7 +146,7 @@ export function SeminarsEventsCelebrations({
       className="shadow-sm hover:shadow-md transition-shadow rounded-xl border border-slate-200 dark:border-zinc-800 flex flex-col h-full overflow-hidden"
       styles={{ body: { flex: 1, padding: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } }}
     >
-      <div className="flex-1 space-y-3 overflow-y-auto p-3 sm:p-4 max-h-[60vh] sm:max-h-[420px]">
+      <div className="flex-1 space-y-3 overflow-y-auto p-3 sm:p-4 max-h-[80vh] sm:max-h-[550px]">
         {eventsVisible && (
           <div className={`rounded-xl border p-3 ${COLOR_THEMES.blue.section}`}>
             <SectionHeader icon="📅" title="Seminars / Events / Meetings" count={events.length} theme="blue" />
