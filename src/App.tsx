@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   Layout, Menu, Button, Card, Table, Modal, Input, Row, Col, Space, Badge, Radio, 
-  Switch, Tag, Spin, Popconfirm, Avatar, Divider, message, ConfigProvider, theme, Empty, Progress,
+  Switch, Tag, Spin, Popconfirm, Avatar, Divider, ConfigProvider, theme, Empty, Progress,
   App as AntdApp, Tabs, Breadcrumb, Pagination
 } from 'antd';
 import { 
@@ -26,6 +26,7 @@ import { ScientistForm, ProjectForm } from './components/AdminForms';
 import { ProjectStaffForm, PermanentStaffForm, YPConsultantForm } from './components/StaffForms';
 import { ComplaintPortal } from './components/ComplaintPortal';
 import { EventRequirementPortal } from './components/EventRequirementPortal';
+import { CentralLabEquipmentPortal } from './components/CentralLabEquipmentPortal';
 import { SalaryPortalView, AdminSalariesManager } from './components/SalaryPortal';
 import { AppHeader } from './components/layout/AppHeader';
 import { HomeDashboard } from './components/HomeDashboard';
@@ -117,8 +118,17 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [submittingLogin, setSubmittingLogin] = useState(false);
 
-  // App Theme & Navigation State
-  const [currentKey, setCurrentKey] = useState<string>('public-dashboard');
+  // App Theme & Navigation State (Persisted across actions & refreshes)
+  const [currentKey, setCurrentKey] = useState<string>(() => {
+    const saved = localStorage.getItem('nihr_current_key');
+    if (saved) return saved;
+    return 'public-dashboard';
+  });
+
+  const handleSetCurrentKey = (key: string) => {
+    setCurrentKey(key);
+    localStorage.setItem('nihr_current_key', key);
+  };
   const [dashboardTab, setDashboardTab] = useState<string>('scientists');
   const [selectedScientist, setSelectedScientist] = useState<Scientist | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -594,7 +604,11 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
         const admin = await apiService.getCurrentAdmin();
         setCurrentAdmin(admin);
         setIsAuthenticated(true);
-        setCurrentKey('admin-dashboard'); // Redirect to admin panel
+        // Only set default admin dashboard if no current navigation key is persisted
+        const savedKey = localStorage.getItem('nihr_current_key');
+        if (!savedKey) {
+          handleSetCurrentKey('admin-dashboard');
+        }
         if (admin.id === 'admin-1') {
           try {
             const adminProfiles = await apiService.getAdmins();
@@ -716,7 +730,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       setCurrentAdmin(response.admin);
       setIsAuthenticated(true);
       setShowLoginModal(false);
-      setCurrentKey('admin-dashboard');
+      handleSetCurrentKey('admin-dashboard');
       message.success(`Welcome back, ${response.admin.name}!`);
       // Reload admin details only if primary super admin (admin-1)
       if (response.admin.id === 'admin-1') {
@@ -741,7 +755,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     apiService.logout();
     setIsAuthenticated(false);
     setCurrentAdmin(null);
-    setCurrentKey('public-dashboard');
+    handleSetCurrentKey('public-dashboard');
     message.success('Logged out successfully.');
   };
 
@@ -1181,6 +1195,10 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
       return <EventRequirementPortal />;
     }
 
+    if (currentKey === 'lab-equipment') {
+      return <CentralLabEquipmentPortal />;
+    }
+
     if (currentKey === 'outsourcing') {
       return (
         <OutsourcingPortal 
@@ -1205,6 +1223,8 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
           circulars={circulars}
           forms={forms}
           handleDownloadBase64File={handleDownloadBase64File}
+          currentAdmin={currentAdmin}
+          setCurrentKey={handleSetCurrentKey}
         />
       );
     }
@@ -1302,6 +1322,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
                 isAdmin={true}
                 onSendMessage={handleBroadcastMessage}
                 onDeleteMessage={(id) => handleDelete('broadcast', id)}
+                currentAdmin={currentAdmin}
               />
             </Col>
             <Col xs={24} lg={8}>
@@ -1484,7 +1505,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto mb-6 px-4">
               The Super Admin Accounts Management panel is restricted to the Primary Admin only. You do not have permission to view or modify super admin credentials.
             </p>
-            <Button type="primary" onClick={() => setCurrentKey('admin-dashboard')} className="rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 border-0 h-8">
+            <Button type="primary" onClick={() => handleSetCurrentKey('admin-dashboard')} className="rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 border-0 h-8">
               Back to Dashboard
             </Button>
           </Card>
@@ -1945,7 +1966,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
     <Layout className="min-h-screen bg-[#F8FAFC] dark:bg-zinc-950 transition-colors duration-300">
         <AppHeader
           currentKey={currentKey}
-          setCurrentKey={setCurrentKey}
+          setCurrentKey={handleSetCurrentKey}
           isAuthenticated={isAuthenticated}
           currentAdmin={currentAdmin}
           handleLogout={handleLogout}
@@ -2080,6 +2101,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <Formik
               initialValues={{ name: '', email: '', password: '', ...editRecord }}
               onSubmit={(v) => handleCreateOrUpdate('admin', v)}
+              enableReinitialize={true}
             >
               {({ isSubmitting, setFieldValue, values }) => (
                 <Form className="space-y-4">
@@ -2112,6 +2134,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <Formik
               initialValues={{ title: '', fileName: '', fileData: '', ...editRecord }}
               onSubmit={(v) => handleCreateOrUpdate('circular', v)}
+              enableReinitialize={true}
             >
               {({ isSubmitting, setFieldValue, values }) => (
                 <Form className="space-y-4">
@@ -2146,6 +2169,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <Formik
               initialValues={{ title: '', fileName: '', fileData: '', ...editRecord }}
               onSubmit={(v) => handleCreateOrUpdate('form', v)}
+              enableReinitialize={true}
             >
               {({ isSubmitting, setFieldValue, values }) => (
                 <Form className="space-y-4">
@@ -2180,6 +2204,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <Formik
               initialValues={{ title: '', fileName: '', fileData: '', ...editRecord }}
               onSubmit={(v) => handleCreateOrUpdate('announcement', v)}
+              enableReinitialize={true}
             >
               {({ isSubmitting, setFieldValue, values }) => (
                 <Form className="space-y-4">
@@ -2213,6 +2238,7 @@ function InnerApp({ themeMode, setThemeMode }: InnerAppProps) {
             <Formik
               initialValues={{ title: '', venue: '', time: '', date: new Date().toISOString().split('T')[0], description: '', ...editRecord }}
               onSubmit={(v) => handleCreateOrUpdate('event', v)}
+              enableReinitialize={true}
             >
               {({ isSubmitting }) => (
                 <Form className="space-y-4">

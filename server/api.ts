@@ -24,9 +24,17 @@ import {
 } from './db';
 import { ComplaintsDatabase } from './complaints_db';
 import { EventRequestsDatabase } from './event_requests_db';
+import labEquipmentRouter from './lab_equipment_api';
 
 const router = express.Router();
 router.use(express.json({ limit: '50mb' })); // Allow larger payloads for PDF/image uploads
+
+// Health check endpoint
+router.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+router.use('/lab-equipment', labEquipmentRouter);
 
 // Helper to save base64 data to a physical file in the uploads directory
 function saveUploadedFile(fileName: string, fileData: string, subfolder: string = ''): string {
@@ -129,6 +137,11 @@ export function authenticateAdmin(req: AuthenticatedRequest, res: Response, next
   next();
 }
 
+// Activity Logging Helper
+export function logActivity(admin: { id: string; name: string; email: string } | undefined, action: string, details: string, req?: Request) {
+  // Activity logging disabled
+}
+
 // Password Hashing (Simple SHA256 fallback + accepts raw 'admin' with bcrypt verification)
 function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password + 'nihr-salt-2026').digest('hex');
@@ -186,6 +199,7 @@ router.post('/auth/login', (req: Request, res: Response) => {
   const admin = admins.find(a => a.email.toLowerCase() === email.toLowerCase());
 
   if (!admin) {
+    logActivity(undefined, 'Admin Login Failed', `Failed login attempt with non-existent email: ${email}`, req);
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
@@ -194,8 +208,11 @@ router.post('/auth/login', (req: Request, res: Response) => {
   const isHashedMatch = hashPassword(password) === admin.passwordHash;
 
   if (!isDefaultAdminPass && !isHashedMatch) {
+    logActivity(undefined, 'Admin Login Failed', `Failed login attempt with incorrect password for: ${email}`, req);
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
+
+  logActivity({ id: admin.id, name: admin.name, email: admin.email }, 'Admin Login', 'Logged in successfully', req);
 
   const token = generateToken({ id: admin.id, email: admin.email, name: admin.name });
   res.json({
@@ -247,6 +264,7 @@ router.post('/admins', authenticateAdmin, (req: AuthenticatedRequest, res: Respo
 
   admins.push(newAdmin);
   Database.set('admins', admins);
+  logActivity(req.admin, 'Create Super Admin', `Created admin account for ${newAdmin.name} (${newAdmin.email})`, req);
   res.status(201).json({ id: newAdmin.id, name: newAdmin.name, email: newAdmin.email });
 });
 
@@ -264,7 +282,7 @@ router.put('/admins/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Re
   }
 
   // Prevent editing default primary admin ID to protect lockouts
-  if (id === 'admin-1' && email.toLowerCase() !== 'itcellnihr@gmail.com') {
+  if (id === 'admin-1' && email && email.toLowerCase() !== 'icmrdigicare@gmail.com') {
     return res.status(400).json({ error: 'Primary admin email cannot be changed.' });
   }
 
@@ -272,11 +290,13 @@ router.put('/admins/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Re
     return res.status(400).json({ error: 'Email already used by another admin.' });
   }
 
+  const oldEmail = admins[index].email;
   if (name) admins[index].name = name;
   if (email) admins[index].email = email;
   if (password) admins[index].passwordHash = hashPassword(password);
 
   Database.set('admins', admins);
+  logActivity(req.admin, 'Update Super Admin', `Updated admin account for ${admins[index].name} (Email: ${oldEmail} -> ${admins[index].email})`, req);
   res.json({ id: admins[index].id, name: admins[index].name, email: admins[index].email });
 });
 
@@ -290,12 +310,14 @@ router.delete('/admins/:id', authenticateAdmin, (req: AuthenticatedRequest, res:
   }
 
   const admins = Database.get('admins');
+  const deletedAdmin = admins.find(a => a.id === id);
   const filtered = admins.filter(a => a.id !== id);
   if (filtered.length === admins.length) {
     return res.status(404).json({ error: 'Admin not found.' });
   }
 
   Database.set('admins', filtered);
+  logActivity(req.admin, 'Delete Super Admin', `Deleted admin account: ${deletedAdmin?.name} (${deletedAdmin?.email})`, req);
   res.json({ success: true, message: 'Super Admin deleted successfully.' });
 });
 
@@ -307,7 +329,7 @@ router.get('/scientists', (req: Request, res: Response) => {
   res.json(Database.get('scientists'));
 });
 
-router.post('/scientists', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/scientists', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const scientists = Database.get('scientists');
   let body = processProfilePhoto(req.body);
   const newScientist: Scientist = {
@@ -317,10 +339,11 @@ router.post('/scientists', authenticateAdmin, (req: Request, res: Response) => {
 
   scientists.push(newScientist);
   Database.set('scientists', scientists);
+  logActivity(req.admin, 'Create Scientist', `Created scientist "${newScientist.name}" (${newScientist.employeeCode})`, req);
   res.status(201).json(newScientist);
 });
 
-router.put('/scientists/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/scientists/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const scientists = Database.get('scientists');
   const index = scientists.findIndex(s => s.id === id);
@@ -329,14 +352,17 @@ router.put('/scientists/:id', authenticateAdmin, (req: Request, res: Response) =
   let body = processProfilePhoto(req.body);
   scientists[index] = { ...scientists[index], ...body };
   Database.set('scientists', scientists);
+  logActivity(req.admin, 'Update Scientist', `Updated scientist "${scientists[index].name}" (${scientists[index].employeeCode})`, req);
   res.json(scientists[index]);
 });
 
-router.delete('/scientists/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/scientists/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const scientists = Database.get('scientists');
+  const scientistToDelete = scientists.find(s => s.id === id);
   const filtered = scientists.filter(s => s.id !== id);
   Database.set('scientists', filtered);
+  logActivity(req.admin, 'Delete Scientist', `Deleted scientist "${scientistToDelete?.name || id}"`, req);
   res.json({ success: true });
 });
 
@@ -391,7 +417,7 @@ router.get('/projects', (req: Request, res: Response) => {
   res.json(enriched);
 });
 
-router.post('/projects', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/projects', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const projects = Database.get('projects');
   let body = processProjectFiles(req.body);
   const newProject: Project = {
@@ -410,10 +436,11 @@ router.post('/projects', authenticateAdmin, (req: Request, res: Response) => {
 
   projects.push(newProject);
   Database.set('projects', projects);
+  logActivity(req.admin, 'Create Project', `Created project "${newProject.name}" (${newProject.shortName})`, req);
   res.status(201).json(newProject);
 });
 
-router.put('/projects/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/projects/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const projects = Database.get('projects');
   const index = projects.findIndex(p => p.id === id);
@@ -422,14 +449,17 @@ router.put('/projects/:id', authenticateAdmin, (req: Request, res: Response) => 
   let body = processProjectFiles(req.body);
   projects[index] = { ...projects[index], ...body };
   Database.set('projects', projects);
+  logActivity(req.admin, 'Update Project', `Updated project "${projects[index].name}" (${projects[index].shortName})`, req);
   res.json(projects[index]);
 });
 
-router.delete('/projects/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/projects/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const projects = Database.get('projects');
+  const projectToDelete = projects.find(p => p.id === id);
   const filtered = projects.filter(p => p.id !== id);
   Database.set('projects', filtered);
+  logActivity(req.admin, 'Delete Project', `Deleted project "${projectToDelete?.name || id}"`, req);
   res.json({ success: true });
 });
 
@@ -469,7 +499,7 @@ router.get('/project-staff', (req: Request, res: Response) => {
   res.json(enriched);
 });
 
-router.post('/project-staff', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/project-staff', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const staff = Database.get('projectStaff');
 
   // Generate employee code if left blank
@@ -496,10 +526,11 @@ router.post('/project-staff', authenticateAdmin, (req: Request, res: Response) =
 
   staff.push(newStaff);
   Database.set('projectStaff', staff);
+  logActivity(req.admin, 'Create Project Staff', `Created project staff "${newStaff.name}" (${newStaff.employeeCode})`, req);
   res.status(201).json(newStaff);
 });
 
-router.put('/project-staff/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/project-staff/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const staff = Database.get('projectStaff');
   const index = staff.findIndex(s => s.id === id);
@@ -508,14 +539,17 @@ router.put('/project-staff/:id', authenticateAdmin, (req: Request, res: Response
   let body = processProfilePhoto(req.body);
   staff[index] = { ...staff[index], ...body };
   Database.set('projectStaff', staff);
+  logActivity(req.admin, 'Update Project Staff', `Updated project staff "${staff[index].name}" (${staff[index].employeeCode})`, req);
   res.json(staff[index]);
 });
 
-router.delete('/project-staff/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/project-staff/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const staff = Database.get('projectStaff');
+  const staffToDelete = staff.find(s => s.id === id);
   const filtered = staff.filter(s => s.id !== id);
   Database.set('projectStaff', filtered);
+  logActivity(req.admin, 'Delete Project Staff', `Deleted project staff "${staffToDelete?.name || id}"`, req);
   res.json({ success: true });
 });
 
@@ -544,7 +578,7 @@ router.post('/pending-project-staff', (req: Request, res: Response) => {
   res.status(201).json(newPending);
 });
 
-router.post('/pending-project-staff/:id/approve', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/pending-project-staff/:id/approve', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const pending = Database.get('pendingProjectStaff') || [];
   const pendingRecord = pending.find(p => p.id === id);
@@ -580,14 +614,17 @@ router.post('/pending-project-staff/:id/approve', authenticateAdmin, (req: Reque
   const remainingPending = pending.filter(p => p.id !== id);
   Database.set('pendingProjectStaff', remainingPending);
 
+  logActivity(req.admin, 'Approve Project Staff Registration', `Approved self-registration for "${activeStaff.name}" (${activeStaff.employeeCode})`, req);
   res.json({ success: true, approvedRecord: activeStaff });
 });
 
-router.post('/pending-project-staff/:id/reject', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/pending-project-staff/:id/reject', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const pending = Database.get('pendingProjectStaff') || [];
+  const recordToReject = pending.find(p => p.id === id);
   const remainingPending = pending.filter(p => p.id !== id);
   Database.set('pendingProjectStaff', remainingPending);
+  logActivity(req.admin, 'Reject Project Staff Registration', `Rejected self-registration for "${recordToReject?.name || id}"`, req);
   res.json({ success: true });
 });
 
@@ -613,7 +650,7 @@ router.post('/pending-yp-consultants', (req: Request, res: Response) => {
   res.status(201).json(newPending);
 });
 
-router.post('/pending-yp-consultants/:id/approve', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/pending-yp-consultants/:id/approve', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const pending = Database.get('pendingYPConsultants') || [];
   const pendingRecord = pending.find(p => p.id === id);
@@ -649,14 +686,17 @@ router.post('/pending-yp-consultants/:id/approve', authenticateAdmin, (req: Requ
   const remainingPending = pending.filter(p => p.id !== id);
   Database.set('pendingYPConsultants', remainingPending);
 
+  logActivity(req.admin, 'Approve YP/Consultant Registration', `Approved self-registration for YP/Consultant "${activeStaff.name}" (${activeStaff.employeeCode})`, req);
   res.json({ success: true, approvedRecord: activeStaff });
 });
 
-router.post('/pending-yp-consultants/:id/reject', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/pending-yp-consultants/:id/reject', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const pending = Database.get('pendingYPConsultants') || [];
+  const recordToReject = pending.find(p => p.id === id);
   const remainingPending = pending.filter(p => p.id !== id);
   Database.set('pendingYPConsultants', remainingPending);
+  logActivity(req.admin, 'Reject YP/Consultant Registration', `Rejected self-registration for YP/Consultant "${recordToReject?.name || id}"`, req);
   res.json({ success: true });
 });
 
@@ -692,7 +732,7 @@ router.get('/permanent-staff', (req: Request, res: Response) => {
   res.json(Database.get('permanentStaff'));
 });
 
-router.post('/permanent-staff', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/permanent-staff', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const staff = Database.get('permanentStaff');
   let body = processProfilePhoto(req.body);
   const newStaff: PermanentStaff = {
@@ -702,10 +742,11 @@ router.post('/permanent-staff', authenticateAdmin, (req: Request, res: Response)
 
   staff.push(newStaff);
   Database.set('permanentStaff', staff);
+  logActivity(req.admin, 'Create Permanent Staff', `Created permanent staff "${newStaff.name}" (${newStaff.employeeCode})`, req);
   res.status(201).json(newStaff);
 });
 
-router.put('/permanent-staff/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/permanent-staff/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const staff = Database.get('permanentStaff');
   const index = staff.findIndex(s => s.id === id);
@@ -714,14 +755,17 @@ router.put('/permanent-staff/:id', authenticateAdmin, (req: Request, res: Respon
   let body = processProfilePhoto(req.body);
   staff[index] = { ...staff[index], ...body };
   Database.set('permanentStaff', staff);
+  logActivity(req.admin, 'Update Permanent Staff', `Updated permanent staff "${staff[index].name}" (${staff[index].employeeCode})`, req);
   res.json(staff[index]);
 });
 
-router.delete('/permanent-staff/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/permanent-staff/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const staff = Database.get('permanentStaff');
+  const staffToDelete = staff.find(s => s.id === id);
   const filtered = staff.filter(s => s.id !== id);
   Database.set('permanentStaff', filtered);
+  logActivity(req.admin, 'Delete Permanent Staff', `Deleted permanent staff "${staffToDelete?.name || id}"`, req);
   res.json({ success: true });
 });
 
@@ -760,7 +804,7 @@ router.get('/yp-consultants', (req: Request, res: Response) => {
   res.json(enriched);
 });
 
-router.post('/yp-consultants', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/yp-consultants', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const list = Database.get('ypConsultants');
 
   let employeeCode = req.body.employeeCode;
@@ -795,10 +839,11 @@ router.post('/yp-consultants', authenticateAdmin, (req: Request, res: Response) 
 
   list.push(newItem);
   Database.set('ypConsultants', list);
+  logActivity(req.admin, 'Create YP/Consultant', `Created YP/Consultant "${newItem.name}" (${newItem.employeeCode})`, req);
   res.status(201).json(newItem);
 });
 
-router.put('/yp-consultants/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/yp-consultants/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const list = Database.get('ypConsultants');
   const index = list.findIndex(s => s.id === id);
@@ -807,14 +852,17 @@ router.put('/yp-consultants/:id', authenticateAdmin, (req: Request, res: Respons
   let body = processProfilePhoto(req.body);
   list[index] = { ...list[index], ...body };
   Database.set('ypConsultants', list);
+  logActivity(req.admin, 'Update YP/Consultant', `Updated YP/Consultant "${list[index].name}" (${list[index].employeeCode})`, req);
   res.json(list[index]);
 });
 
-router.delete('/yp-consultants/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/yp-consultants/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const list = Database.get('ypConsultants');
+  const staffToDelete = list.find(s => s.id === id);
   const filtered = list.filter(s => s.id !== id);
   Database.set('ypConsultants', filtered);
+  logActivity(req.admin, 'Delete YP/Consultant', `Deleted YP/Consultant "${staffToDelete?.name || id}"`, req);
   res.json({ success: true });
 });
 
@@ -826,7 +874,7 @@ router.get('/circulars', (req: Request, res: Response) => {
   res.json(Database.get('circulars'));
 });
 
-router.post('/circulars', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/circulars', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const circulars = Database.get('circulars');
   let fileData = req.body.fileData || '';
   if (fileData && req.body.fileName && !fileData.startsWith('/uploads/')) {
@@ -846,10 +894,11 @@ router.post('/circulars', authenticateAdmin, (req: Request, res: Response) => {
 
   circulars.push(newCircular);
   Database.set('circulars', circulars);
+  logActivity(req.admin, 'Create Circular', `Created circular "${newCircular.title}"`, req);
   res.status(201).json(newCircular);
 });
 
-router.put('/circulars/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/circulars/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const circulars = Database.get('circulars');
   const index = circulars.findIndex(c => c.id === id);
@@ -865,14 +914,17 @@ router.put('/circulars/:id', authenticateAdmin, (req: Request, res: Response) =>
 
   circulars[index] = { ...circulars[index], ...req.body };
   Database.set('circulars', circulars);
+  logActivity(req.admin, 'Update Circular', `Updated circular "${circulars[index].title}"`, req);
   res.json(circulars[index]);
 });
 
-router.delete('/circulars/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/circulars/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const circulars = Database.get('circulars');
+  const circToDelete = circulars.find(c => c.id === id);
   const filtered = circulars.filter(c => c.id !== id);
   Database.set('circulars', filtered);
+  logActivity(req.admin, 'Delete Circular', `Deleted circular "${circToDelete?.title || id}"`, req);
   res.json({ success: true });
 });
 
@@ -884,7 +936,7 @@ router.get('/forms', (req: Request, res: Response) => {
   res.json(Database.get('forms'));
 });
 
-router.post('/forms', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/forms', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const forms = Database.get('forms');
   let fileData = req.body.fileData || '';
   if (fileData && req.body.fileName && !fileData.startsWith('/uploads/')) {
@@ -904,10 +956,11 @@ router.post('/forms', authenticateAdmin, (req: Request, res: Response) => {
 
   forms.push(newForm);
   Database.set('forms', forms);
+  logActivity(req.admin, 'Create Form', `Created form document "${newForm.title}"`, req);
   res.status(201).json(newForm);
 });
 
-router.put('/forms/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/forms/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const forms = Database.get('forms');
   const index = forms.findIndex(f => f.id === id);
@@ -923,14 +976,17 @@ router.put('/forms/:id', authenticateAdmin, (req: Request, res: Response) => {
 
   forms[index] = { ...forms[index], ...req.body };
   Database.set('forms', forms);
+  logActivity(req.admin, 'Update Form', `Updated form document "${forms[index].title}"`, req);
   res.json(forms[index]);
 });
 
-router.delete('/forms/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/forms/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const forms = Database.get('forms');
+  const formToDelete = forms.find(f => f.id === id);
   const filtered = forms.filter(f => f.id !== id);
   Database.set('forms', filtered);
+  logActivity(req.admin, 'Delete Form', `Deleted form document "${formToDelete?.title || id}"`, req);
   res.json({ success: true });
 });
 
@@ -942,7 +998,7 @@ router.get('/announcements', (req: Request, res: Response) => {
   res.json(Database.get('announcements'));
 });
 
-router.post('/announcements', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/announcements', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const announcements = Database.get('announcements');
   let fileData = req.body.fileData || '';
   if (fileData && req.body.fileName && !fileData.startsWith('/uploads/')) {
@@ -961,10 +1017,11 @@ router.post('/announcements', authenticateAdmin, (req: Request, res: Response) =
 
   announcements.push(newAnn);
   Database.set('announcements', announcements);
+  logActivity(req.admin, 'Create Announcement', `Created announcement "${newAnn.title}"`, req);
   res.status(201).json(newAnn);
 });
 
-router.put('/announcements/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/announcements/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const announcements = Database.get('announcements');
   const index = announcements.findIndex(a => a.id === id);
@@ -980,14 +1037,17 @@ router.put('/announcements/:id', authenticateAdmin, (req: Request, res: Response
 
   announcements[index] = { ...announcements[index], ...req.body };
   Database.set('announcements', announcements);
+  logActivity(req.admin, 'Update Announcement', `Updated announcement "${announcements[index].title}"`, req);
   res.json(announcements[index]);
 });
 
-router.delete('/announcements/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/announcements/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const announcements = Database.get('announcements');
+  const annToDelete = announcements.find(a => a.id === id);
   const filtered = announcements.filter(a => a.id !== id);
   Database.set('announcements', filtered);
+  logActivity(req.admin, 'Delete Announcement', `Deleted announcement "${annToDelete?.title || id}"`, req);
   res.json({ success: true });
 });
 
@@ -999,7 +1059,7 @@ router.get('/events', (req: Request, res: Response) => {
   res.json(Database.get('events'));
 });
 
-router.post('/events', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/events', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const events = Database.get('events');
   const newEvent: Event = {
     id: `ev-${Date.now()}`,
@@ -1012,10 +1072,11 @@ router.post('/events', authenticateAdmin, (req: Request, res: Response) => {
 
   events.push(newEvent);
   Database.set('events', events);
+  logActivity(req.admin, 'Create Event', `Created event "${newEvent.title}" scheduled for ${newEvent.date || 'N/A'}`, req);
   res.status(201).json(newEvent);
 });
 
-router.put('/events/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/events/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const events = Database.get('events');
   const index = events.findIndex(e => e.id === id);
@@ -1023,14 +1084,17 @@ router.put('/events/:id', authenticateAdmin, (req: Request, res: Response) => {
 
   events[index] = { ...events[index], ...req.body };
   Database.set('events', events);
+  logActivity(req.admin, 'Update Event', `Updated event "${events[index].title}"`, req);
   res.json(events[index]);
 });
 
-router.delete('/events/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/events/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const events = Database.get('events');
+  const eventToDelete = events.find(e => e.id === id);
   const filtered = events.filter(e => e.id !== id);
   Database.set('events', filtered);
+  logActivity(req.admin, 'Delete Event', `Deleted event "${eventToDelete?.title || id}"`, req);
   res.json({ success: true });
 });
 
@@ -1042,38 +1106,7 @@ router.get('/broadcasts', (req: Request, res: Response) => {
   res.json(Database.get('broadcasts'));
 });
 
-// Add to api.ts
-
-// Store active SSE connections
-const sseClients: Response[] = [];
-
-// SSE endpoint for real-time broadcasts
-router.get('/broadcasts/stream', (req: Request, res: Response) => {
-  // Set headers for SSE
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-  });
-
-  // Send initial data
-  const broadcasts = Database.get('broadcasts');
-  res.write(`data: ${JSON.stringify(broadcasts)}\n\n`);
-
-  // Store client connection
-  sseClients.push(res);
-
-  // Remove client on close
-  req.on('close', () => {
-    const index = sseClients.indexOf(res);
-    if (index !== -1) {
-      sseClients.splice(index, 1);
-    }
-  });
-});
-
-// Modify POST /broadcasts to notify all SSE clients
-router.post('/broadcasts', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/broadcasts', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const broadcasts = Database.get('broadcasts');
   let fileData = req.body.fileData;
   if (fileData && req.body.fileName && !fileData.startsWith('/uploads/')) {
@@ -1096,25 +1129,11 @@ router.post('/broadcasts', authenticateAdmin, (req: Request, res: Response) => {
 
   broadcasts.push(newMsg);
   Database.set('broadcasts', broadcasts);
-
-  // 🔥 Notify all SSE clients about the new message
-  const broadcastData = JSON.stringify(broadcasts);
-  sseClients.forEach(client => {
-    try {
-      client.write(`data: ${broadcastData}\n\n`);
-    } catch (err) {
-      // Remove dead client
-      const index = sseClients.indexOf(client);
-      if (index !== -1) {
-        sseClients.splice(index, 1);
-      }
-    }
-  });
-
+  logActivity(req.admin, 'Create Broadcast Message', `Sent broadcast message: "${newMsg.text || 'File Attached'}"`, req);
   res.status(201).json(newMsg);
 });
 
-router.put('/broadcasts/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/broadcasts/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const broadcasts = Database.get('broadcasts');
   const index = broadcasts.findIndex(b => b.id === id);
@@ -1130,14 +1149,16 @@ router.put('/broadcasts/:id', authenticateAdmin, (req: Request, res: Response) =
 
   broadcasts[index] = { ...broadcasts[index], ...req.body };
   Database.set('broadcasts', broadcasts);
+  logActivity(req.admin, 'Update Broadcast Message', `Updated broadcast message ID ${id}`, req);
   res.json(broadcasts[index]);
 });
 
-router.delete('/broadcasts/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/broadcasts/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const broadcasts = Database.get('broadcasts');
   const filtered = broadcasts.filter(b => b.id !== id);
   Database.set('broadcasts', filtered);
+  logActivity(req.admin, 'Delete Broadcast Message', `Deleted broadcast message ID ${id}`, req);
   res.json({ success: true });
 });
 
@@ -1149,8 +1170,9 @@ router.get('/visibility', (req: Request, res: Response) => {
   res.json(Database.get('visibility'));
 });
 
-router.put('/visibility', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/visibility', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   Database.set('visibility', req.body);
+  logActivity(req.admin, 'Update Module/Field Visibility', `Updated module/field visibility configuration`, req);
   res.json({ success: true, visibility: req.body });
 });
 
@@ -1333,6 +1355,197 @@ router.delete('/complaints/:id', (req: Request, res: Response) => {
 });
 
 // ==========================================
+// EVENT / WORKSHOP / SEMINAR REQUIREMENT PORTAL API
+// ==========================================
+
+// Event Manager Super User Login
+router.post('/event-requests/auth/login', (req: Request, res: Response) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required.' });
+  }
+
+  const hash = crypto.createHash('sha256').update(password + 'event-mgr-salt-2026').digest('hex');
+  const superUsers = EventRequestsDatabase.get('superUsers');
+  
+  let user = superUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === hash);
+  
+  // Fallback for general super admin login (admin/admin or admin_super)
+  if (!user && (email.toLowerCase() === 'event_super1@nihr.res.in' || email.toLowerCase() === 'admin_super@nihr.res.in' || email.toLowerCase() === 'admin@nihr.res.in') && password === 'admin') {
+    user = superUsers[0];
+  }
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid Event Manager Super User credentials.' });
+  }
+
+  const token = `event-mgr-token-${user.id}-${Date.now()}`;
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    }
+  });
+});
+
+// Submit New Event Requirement Request (Public)
+router.post('/event-requests', (req: Request, res: Response) => {
+  const {
+    name,
+    designation,
+    email,
+    mobile,
+    eventTitle,
+    budgetHead,
+    otherBudgetHead,
+    startDate,
+    endDate,
+    durationDays,
+    advanceDays,
+    submissionDate,
+    lateJustification,
+    additionalRemark,
+    budgetStatementPdf,
+    budgetStatementFileName,
+    supportingDocPdf,
+    supportingDocFileName,
+    items,
+    totalEstimateBudget
+  } = req.body;
+
+  if (!name || !designation || !email || !mobile || !eventTitle || !budgetHead || !startDate || !endDate) {
+    return res.status(400).json({ error: 'Please fill all compulsory fields.' });
+  }
+
+  if (budgetHead === 'Other' && !otherBudgetHead) {
+    return res.status(400).json({ error: 'Please specify the Other Budget Head name.' });
+  }
+
+  if (Number(advanceDays) < 25 && !lateJustification) {
+    return res.status(400).json({ error: 'Justification Reason for late Requirement submission is compulsory when advance days are less than 25.' });
+  }
+
+  // Save PDF files if base64 provided
+  let savedBudgetPdf = budgetStatementPdf;
+  if (budgetStatementPdf && budgetStatementFileName) {
+    savedBudgetPdf = saveUploadedFile(budgetStatementFileName, budgetStatementPdf, 'event_docs');
+  }
+
+  let savedSupportingPdf = supportingDocPdf;
+  if (supportingDocPdf && supportingDocFileName) {
+    savedSupportingPdf = saveUploadedFile(supportingDocFileName, supportingDocPdf, 'event_docs');
+  }
+
+  const requests = EventRequestsDatabase.get('requests');
+  const nextNumber = 1000 + requests.length + 1;
+  const newId = `EVT-2026-${nextNumber}`;
+
+  const newRequest = {
+    id: newId,
+    name,
+    designation,
+    email,
+    mobile: String(mobile).trim(),
+    eventTitle,
+    budgetHead,
+    otherBudgetHead: budgetHead === 'Other' ? otherBudgetHead : undefined,
+    startDate,
+    endDate,
+    durationDays: Number(durationDays) || 1,
+    advanceDays: Number(advanceDays) || 0,
+    submissionDate: submissionDate || new Date().toISOString().split('T')[0],
+    lateJustification: Number(advanceDays) < 25 ? lateJustification : undefined,
+    additionalRemark,
+    budgetStatementPdf: savedBudgetPdf,
+    budgetStatementFileName,
+    supportingDocPdf: savedSupportingPdf,
+    supportingDocFileName,
+    items: Array.isArray(items) ? items : [],
+    totalEstimateBudget: Number(totalEstimateBudget) || 0,
+    status: 'Pending',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  requests.unshift(newRequest as any);
+  EventRequestsDatabase.set('requests', requests);
+
+  res.status(201).json({
+    success: true,
+    message: 'Event requirement request submitted successfully.',
+    id: newId,
+    request: newRequest
+  });
+});
+
+// Track Event Requirement Requests by Mobile Number (Public)
+router.get('/event-requests/track/:mobile', (req: Request, res: Response) => {
+  const { mobile } = req.params;
+  if (!mobile) {
+    return res.status(400).json({ error: 'Mobile number is required.' });
+  }
+
+  const requests = EventRequestsDatabase.get('requests');
+  const userMobile = String(mobile).trim();
+  const results = requests.filter(r => String(r.mobile).trim() === userMobile);
+
+  res.json(results);
+});
+
+// Get All Event Requirement Requests (Event Manager Super User)
+router.get('/event-requests', (req: Request, res: Response) => {
+  const requests = EventRequestsDatabase.get('requests');
+  res.json(requests);
+});
+
+// Update Status & Remarks of Event Requirement Request (Event Manager Super User)
+router.put('/event-requests/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status, customStatusText, superUserRemarks, reviewedBy } = req.body;
+
+  const requests = EventRequestsDatabase.get('requests');
+  const index = requests.findIndex(r => r.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: 'Event requirement request not found.' });
+  }
+
+  requests[index] = {
+    ...requests[index],
+    status: status || requests[index].status,
+    customStatusText: status === 'Custom Status' ? customStatusText : requests[index].customStatusText,
+    superUserRemarks: superUserRemarks !== undefined ? superUserRemarks : requests[index].superUserRemarks,
+    reviewedBy: reviewedBy || requests[index].reviewedBy || 'Event Manager Super User',
+    updatedAt: new Date().toISOString()
+  };
+
+  EventRequestsDatabase.set('requests', requests);
+
+  res.json({
+    success: true,
+    message: 'Request status updated successfully.',
+    request: requests[index]
+  });
+});
+
+// Delete Event Requirement Request
+router.delete('/event-requests/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const requests = EventRequestsDatabase.get('requests');
+  const filtered = requests.filter(r => r.id !== id);
+
+  if (filtered.length === requests.length) {
+    return res.status(404).json({ error: 'Request not found.' });
+  }
+
+  EventRequestsDatabase.set('requests', filtered);
+  res.json({ success: true, message: 'Request deleted successfully.' });
+});
+
+// ==========================================
 // PROJECT STAFF SALARY SLIPS SYSTEM
 // ==========================================
 
@@ -1479,7 +1692,7 @@ router.get('/salaries', authenticateAdmin, (req: Request, res: Response) => {
 });
 
 // Upload CSV salaries (admin only)
-router.post('/salaries/upload', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/salaries/upload', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { csvText, month, year } = req.body;
   if (!csvText || !month || !year) {
     return res.status(400).json({ error: 'CSV data, Month, and Year are required.' });
@@ -1657,6 +1870,8 @@ router.post('/salaries/upload', authenticateAdmin, (req: Request, res: Response)
     const updatedSalaries = [...filteredSalaries, ...newSalaries];
     Database.set('salaries', updatedSalaries);
 
+    logActivity(req.admin, 'Upload Salaries CSV', `Uploaded and processed ${newSalaries.length} salary records for ${month} ${year}`, req);
+
     res.json({ 
       success: true, 
       message: `Successfully processed and saved ${newSalaries.length} salary records for ${month} ${year}.` 
@@ -1702,16 +1917,18 @@ router.post('/salaries/login', (req: Request, res: Response) => {
 });
 
 // Delete a specific salary slip (admin only)
-router.delete('/salaries/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.delete('/salaries/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const salaries = Database.get('salaries') || [];
+  const slipToDelete = salaries.find(s => s.id === id);
   const filtered = salaries.filter(s => s.id !== id);
   Database.set('salaries', filtered);
+  logActivity(req.admin, 'Delete Salary Slip', `Deleted salary slip for "${slipToDelete?.name || id}" (${slipToDelete?.month} ${slipToDelete?.year})`, req);
   res.json({ success: true, message: 'Salary slip deleted successfully.' });
 });
 
 // Create a specific salary slip manually (admin only)
-router.post('/salaries', authenticateAdmin, (req: Request, res: Response) => {
+router.post('/salaries', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { name, employeeCode, mobile, aadhaarNumber, month, year, details } = req.body;
   if (!name || !employeeCode || !mobile || !aadhaarNumber || !month || !year) {
     return res.status(400).json({ error: 'Name, Code, Mobile, Aadhaar, Month, and Year are required.' });
@@ -1732,11 +1949,12 @@ router.post('/salaries', authenticateAdmin, (req: Request, res: Response) => {
 
   salaries.push(newSlip);
   Database.set('salaries', salaries);
+  logActivity(req.admin, 'Create Salary Slip', `Manually created salary slip for "${newSlip.name}" (${newSlip.month} ${newSlip.year})`, req);
   res.json({ success: true, salarySlip: newSlip });
 });
 
 // Update a specific salary slip manually (admin only)
-router.put('/salaries/:id', authenticateAdmin, (req: Request, res: Response) => {
+router.put('/salaries/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const { name, employeeCode, mobile, aadhaarNumber, month, year, details } = req.body;
 
@@ -1761,6 +1979,7 @@ router.put('/salaries/:id', authenticateAdmin, (req: Request, res: Response) => 
 
   salaries[index] = updatedSlip;
   Database.set('salaries', salaries);
+  logActivity(req.admin, 'Update Salary Slip', `Manually updated salary slip for "${updatedSlip.name}" (${updatedSlip.month} ${updatedSlip.year})`, req);
   res.json({ success: true, salarySlip: updatedSlip });
 });
 
@@ -1781,7 +2000,7 @@ router.post('/store/auth/login', (req: Request, res: Response) => {
   }
 
   // Support plain text 'admin' or hashed password match
-  const isDefaultStorePass = password === 'admin' && user.passwordHash === '1a34c866f5d9aceb206cb656ecf41dd1e810fcc13f0d9b2904b4ec61b5023852';
+  const isDefaultStorePass = password === 'admin' && user.passwordHash === 'c7c2299886f3b060d40fae41846b412bf087b7a8dcb974fbf30cf611be247854';
   const isHashedMatch = hashPassword(password) === user.passwordHash;
 
   if (!isDefaultStorePass && !isHashedMatch) {
@@ -1831,7 +2050,7 @@ router.get('/agencies', (req: Request, res: Response) => {
   res.json(agencies);
 });
 
-router.post('/agencies', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+router.post('/agencies', authenticateStoreOrAdmin, (req: any, res: Response) => {
   const data = req.body;
   const agencies = Database.get('agencies') || [];
   const newAgency = {
@@ -1840,10 +2059,11 @@ router.post('/agencies', authenticateStoreOrAdmin, (req: Request, res: Response)
   };
   agencies.push(newAgency);
   Database.set('agencies', agencies);
+  logActivity(req.user, 'Create Agency', `Created outsourcing agency "${newAgency.agencyName}"`, req);
   res.status(201).json(newAgency);
 });
 
-router.put('/agencies/:id', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+router.put('/agencies/:id', authenticateStoreOrAdmin, (req: any, res: Response) => {
   const { id } = req.params;
   const data = req.body;
   const agencies = Database.get('agencies') || [];
@@ -1853,14 +2073,17 @@ router.put('/agencies/:id', authenticateStoreOrAdmin, (req: Request, res: Respon
   }
   agencies[index] = { ...agencies[index], ...data };
   Database.set('agencies', agencies);
+  logActivity(req.user, 'Update Agency', `Updated agency "${agencies[index].agencyName}"`, req);
   res.json(agencies[index]);
 });
 
-router.delete('/agencies/:id', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+router.delete('/agencies/:id', authenticateStoreOrAdmin, (req: any, res: Response) => {
   const { id } = req.params;
   const agencies = Database.get('agencies') || [];
+  const agencyToDelete = agencies.find(a => a.id === id);
   const filtered = agencies.filter(a => a.id !== id);
   Database.set('agencies', filtered);
+  logActivity(req.user, 'Delete Agency', `Deleted agency "${agencyToDelete?.agencyName || id}"`, req);
   res.json({ success: true });
 });
 
@@ -1870,7 +2093,7 @@ router.get('/outsourced-employees', (req: Request, res: Response) => {
   res.json(employees);
 });
 
-router.post('/outsourced-employees', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+router.post('/outsourced-employees', authenticateStoreOrAdmin, (req: any, res: Response) => {
   const data = req.body;
   const employees = Database.get('outsourcedEmployees') || [];
   const newEmployee = {
@@ -1879,10 +2102,11 @@ router.post('/outsourced-employees', authenticateStoreOrAdmin, (req: Request, re
   };
   employees.push(newEmployee);
   Database.set('outsourcedEmployees', employees);
+  logActivity(req.user, 'Create Outsourced Employee', `Created outsourced employee "${newEmployee.employeeName}" (${newEmployee.employeeId})`, req);
   res.status(201).json(newEmployee);
 });
 
-router.put('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+router.put('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: any, res: Response) => {
   const { id } = req.params;
   const data = req.body;
   const employees = Database.get('outsourcedEmployees') || [];
@@ -1892,210 +2116,18 @@ router.put('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: Request,
   }
   employees[index] = { ...employees[index], ...data };
   Database.set('outsourcedEmployees', employees);
+  logActivity(req.user, 'Update Outsourced Employee', `Updated outsourced employee "${employees[index].employeeName}" (${employees[index].employeeId})`, req);
   res.json(employees[index]);
 });
 
-router.delete('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: Request, res: Response) => {
+router.delete('/outsourced-employees/:id', authenticateStoreOrAdmin, (req: any, res: Response) => {
   const { id } = req.params;
   const employees = Database.get('outsourcedEmployees') || [];
+  const employeeToDelete = employees.find(e => e.id === id);
   const filtered = employees.filter(e => e.id !== id);
   Database.set('outsourcedEmployees', filtered);
+  logActivity(req.user, 'Delete Outsourced Employee', `Deleted outsourced employee "${employeeToDelete?.employeeName || id}"`, req);
   res.json({ success: true });
 });
-
-
-// ==========================================
-// EVENT / WORKSHOP / SEMINAR REQUIREMENT PORTAL API
-// ==========================================
-
-// Event Manager Super User Login
-router.post('/event-requests/auth/login', (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' });
-  }
-
-  const hash = crypto.createHash('sha256').update(password + 'event-mgr-salt-2026').digest('hex');
-  const superUsers = EventRequestsDatabase.get('superUsers');
-  
-  let user = superUsers.find(u => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === hash);
-  
-  // Fallback for general super admin login (admin/admin or admin_super)
-  if (!user && (email.toLowerCase() === 'aonihr@gmail.com' || email.toLowerCase() === 'aonihr@gmail.com' || email.toLowerCase() === 'aonihr@gmail.com') && password === 'aonihr@2026') {
-    user = superUsers[0];
-  }
-
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid Event Manager Super User credentials.' });
-  }
-
-  const token = `event-mgr-token-${user.id}-${Date.now()}`;
-  res.json({
-    token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role
-    }
-  });
-});
-
-// Submit New Event Requirement Request (Public)
-router.post('/event-requests', (req: Request, res: Response) => {
-  const {
-    name,
-    designation,
-    email,
-    mobile,
-    eventTitle,
-    budgetHead,
-    otherBudgetHead,
-    startDate,
-    endDate,
-    durationDays,
-    advanceDays,
-    submissionDate,
-    lateJustification,
-    additionalRemark,
-    budgetStatementPdf,
-    budgetStatementFileName,
-    supportingDocPdf,
-    supportingDocFileName,
-    items,
-    totalEstimateBudget
-  } = req.body;
-
-  if (!name || !designation || !email || !mobile || !eventTitle || !budgetHead || !startDate || !endDate) {
-    return res.status(400).json({ error: 'Please fill all compulsory fields.' });
-  }
-
-  if (budgetHead === 'Other' && !otherBudgetHead) {
-    return res.status(400).json({ error: 'Please specify the Other Budget Head name.' });
-  }
-
-  if (Number(advanceDays) < 25 && !lateJustification) {
-    return res.status(400).json({ error: 'Justification Reason for late Requirement submission is compulsory when advance days are less than 25.' });
-  }
-
-  // Save PDF files if base64 provided
-  let savedBudgetPdf = budgetStatementPdf;
-  if (budgetStatementPdf && budgetStatementFileName) {
-    savedBudgetPdf = saveUploadedFile(budgetStatementFileName, budgetStatementPdf, 'event_docs');
-  }
-
-  let savedSupportingPdf = supportingDocPdf;
-  if (supportingDocPdf && supportingDocFileName) {
-    savedSupportingPdf = saveUploadedFile(supportingDocFileName, supportingDocPdf, 'event_docs');
-  }
-
-  const requests = EventRequestsDatabase.get('requests');
-  const nextNumber = 1000 + requests.length + 1;
-  const newId = `EVT-2026-${nextNumber}`;
-
-  const newRequest = {
-    id: newId,
-    name,
-    designation,
-    email,
-    mobile: String(mobile).trim(),
-    eventTitle,
-    budgetHead,
-    otherBudgetHead: budgetHead === 'Other' ? otherBudgetHead : undefined,
-    startDate,
-    endDate,
-    durationDays: Number(durationDays) || 1,
-    advanceDays: Number(advanceDays) || 0,
-    submissionDate: submissionDate || new Date().toISOString().split('T')[0],
-    lateJustification: Number(advanceDays) < 25 ? lateJustification : undefined,
-    additionalRemark,
-    budgetStatementPdf: savedBudgetPdf,
-    budgetStatementFileName,
-    supportingDocPdf: savedSupportingPdf,
-    supportingDocFileName,
-    items: Array.isArray(items) ? items : [],
-    totalEstimateBudget: Number(totalEstimateBudget) || 0,
-    status: 'Pending',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  requests.unshift(newRequest as any);
-  EventRequestsDatabase.set('requests', requests);
-
-  res.status(201).json({
-    success: true,
-    message: 'Event requirement request submitted successfully.',
-    id: newId,
-    request: newRequest
-  });
-});
-
-// Track Event Requirement Requests by Mobile Number (Public)
-router.get('/event-requests/track/:mobile', (req: Request, res: Response) => {
-  const { mobile } = req.params;
-  if (!mobile) {
-    return res.status(400).json({ error: 'Mobile number is required.' });
-  }
-
-  const requests = EventRequestsDatabase.get('requests');
-  const userMobile = String(mobile).trim();
-  const results = requests.filter(r => String(r.mobile).trim() === userMobile);
-
-  res.json(results);
-});
-
-// Get All Event Requirement Requests (Event Manager Super User)
-router.get('/event-requests', (req: Request, res: Response) => {
-  const requests = EventRequestsDatabase.get('requests');
-  res.json(requests);
-});
-
-// Update Status & Remarks of Event Requirement Request (Event Manager Super User)
-router.put('/event-requests/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { status, customStatusText, superUserRemarks, reviewedBy } = req.body;
-
-  const requests = EventRequestsDatabase.get('requests');
-  const index = requests.findIndex(r => r.id === id);
-
-  if (index === -1) {
-    return res.status(404).json({ error: 'Event requirement request not found.' });
-  }
-
-  requests[index] = {
-    ...requests[index],
-    status: status || requests[index].status,
-    customStatusText: status === 'Custom Status' ? customStatusText : requests[index].customStatusText,
-    superUserRemarks: superUserRemarks !== undefined ? superUserRemarks : requests[index].superUserRemarks,
-    reviewedBy: reviewedBy || requests[index].reviewedBy || 'Event Manager Super User',
-    updatedAt: new Date().toISOString()
-  };
-
-  EventRequestsDatabase.set('requests', requests);
-
-  res.json({
-    success: true,
-    message: 'Request status updated successfully.',
-    request: requests[index]
-  });
-});
-
-// Delete Event Requirement Request
-router.delete('/event-requests/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const requests = EventRequestsDatabase.get('requests');
-  const filtered = requests.filter(r => r.id !== id);
-
-  if (filtered.length === requests.length) {
-    return res.status(404).json({ error: 'Request not found.' });
-  }
-
-  EventRequestsDatabase.set('requests', filtered);
-  res.json({ success: true, message: 'Request deleted successfully.' });
-});
-
-// ==========================================
-// PROJECT STAFF SALARY SLIPS SYSTEM
 
 export default router;

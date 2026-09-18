@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Switch, Divider, Row, Col, Space, Button, message, Alert, App } from 'antd';
+import { Card, Switch, Divider, Row, Col, Space, Button, Alert, App } from 'antd';
 import { EyeOutlined, EyeInvisibleOutlined, SafetyCertificateOutlined, SettingOutlined } from '@ant-design/icons';
 import { VisibilityConfig } from '../types';
 

@@ -892,7 +892,7 @@ export function OutsourcingPortal({ currentAdmin, isAuthenticated }: Outsourcing
           </Form.Item>
 
           <Form.Item label="Approved Manpower Count" name="approvedManpower" rules={[{ required: true, message: 'Total permitted staff' }]}>
-            <InputNumber className="w-full" min={1} placeholder="10" />
+            <InputNumber className="w-full" min={0} placeholder="10" />
           </Form.Item>
 
           <Form.Item label="Contract Value (INR)" name="contractValue" rules={[{ required: true, message: 'Agreement financial value' }]}>

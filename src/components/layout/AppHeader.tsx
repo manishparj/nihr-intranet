@@ -5,7 +5,8 @@ import {
   CustomerServiceOutlined, HomeOutlined, MenuOutlined, LoginOutlined, 
   LogoutOutlined, BulbOutlined, BulbFilled, AppstoreOutlined, 
   ProjectOutlined, SolutionOutlined, FilePdfOutlined, CalendarOutlined, 
-  SettingOutlined, KeyOutlined, SafetyCertificateOutlined, NotificationOutlined
+  SettingOutlined, KeyOutlined, SafetyCertificateOutlined, NotificationOutlined,
+  ExperimentOutlined
 } from '@ant-design/icons';
 import { VisibilityConfig } from '../../types';
 
@@ -47,10 +48,11 @@ export function AppHeader({
       ...(visibility?.modules.projectStaff ? [{ key: 'public-pstaff', icon: <SolutionOutlined />, label: 'Project Staff' }] : []),
       // ...(visibility?.modules.permanentStaff ? [{ key: 'public-permanent', icon: <TeamOutlined />, label: 'Permanent Staff' }] : []),
       ...(visibility?.modules.ypConsultants ? [{ key: 'public-ypc', icon: <StarOutlined />, label: 'YP & Consultants' }] : []),
-      { key: 'public-salary-portal', icon: <PrinterOutlined />, label: 'Salary Portal' },
-      { key: 'event-requirements', icon: <CalendarOutlined />, label: 'Event Requirements' },
-      { key: 'outsourcing', icon: <SafetyCertificateOutlined />, label: 'Outsourced & Agencies' },
-      { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Complaints Desk' }
+      // { key: 'public-salary-portal', icon: <PrinterOutlined />, label: 'Salary Portal' },
+      { key: 'lab-equipment', icon: <ExperimentOutlined />, label: 'Lab Equipment' },
+      // { key: 'event-requirements', icon: <CalendarOutlined />, label: 'Event Requirements' },
+      { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Complaints Desk' },
+      { key: 'outsourcing', icon: <SafetyCertificateOutlined />, label: 'Outsourced & Agencies' }
     ];
   };
 
@@ -83,7 +85,8 @@ export function AppHeader({
         ]
       },
       { key: 'admin-visibility', icon: <SettingOutlined />, label: 'Visibility' },
-       { key: 'event-requirements', icon: <CalendarOutlined />, label: 'Event Requirements' },
+      { key: 'lab-equipment', icon: <ExperimentOutlined />, label: 'Lab Equipment' },
+      // { key: 'event-requirements', icon: <CalendarOutlined />, label: 'Event Requirements' },
       { key: 'complaints', icon: <CustomerServiceOutlined />, label: 'Complaints Desk' },
       ...(currentAdmin?.id === 'admin-1' ? [{ key: 'admin-accounts', icon: <KeyOutlined />, label: 'Admin Accounts' }] : []),
       { key: 'public-dashboard', icon: <HomeOutlined />, label: 'View Public' }
