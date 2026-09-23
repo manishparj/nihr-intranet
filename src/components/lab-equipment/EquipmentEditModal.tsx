@@ -15,7 +15,10 @@ import {
   PictureOutlined,
   PlusOutlined,
   FilePdfOutlined,
-  DownloadOutlined
+  DownloadOutlined,
+  UserOutlined,
+  MailOutlined,
+  PhoneOutlined
 } from '@ant-design/icons';
 import { Equipment, EquipmentDocument, EquipmentPhoto } from '../../types/labEquipment';
 import { FormInstance } from 'antd/es/form';
@@ -258,16 +261,68 @@ export const EquipmentEditModal: React.FC<EquipmentEditModalProps> = ({
                 name="alertEmails"
                 rules={[{ required: true, message: 'Alert email is mandatory' }]}
               >
-                <Input placeholder="e.g. Email, " className="rounded-xl" />
+                <Input placeholder="e.g. cif_alerts@nihr.res.in, incharge@nihr.res.in" className="rounded-xl" />
               </Form.Item>
             </Col>
           </Row>
         </div>
 
-        {/* Section 3: Financial & Warranty */}
+        {/* Section 3: Contact Person Details */}
+        <div className="bg-blue-50/60 dark:bg-blue-950/20 p-4 rounded-xl border border-blue-200 dark:border-blue-900/40">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="text-xs font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+              <UserOutlined className="text-blue-600" />
+              3. Contact Person Details (Visible in Public Directory)
+            </div>
+            <span className="text-[11px] text-blue-700 dark:text-blue-400 font-medium">
+              Equipment In-Charge / Technical Custodian
+            </span>
+          </div>
+          <Row gutter={12}>
+            <Col xs={24} md={8}>
+              <Form.Item
+                label="Contact Person Name"
+                name="contactPersonName"
+              >
+                <Input
+                  prefix={<UserOutlined className="text-slate-400" />}
+                  placeholder="e.g. Dr. Alok Mathur"
+                  className="rounded-xl"
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item
+                label="Email ID"
+                name="contactPersonEmail"
+                rules={[{ type: 'email', message: 'Please enter a valid email address' }]}
+              >
+                <Input
+                  prefix={<MailOutlined className="text-slate-400" />}
+                  placeholder="e.g. alok.mathur@nihr.res.in"
+                  className="rounded-xl"
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item
+                label="Mobile Number"
+                name="contactPersonMobile"
+              >
+                <Input
+                  prefix={<PhoneOutlined className="text-slate-400" />}
+                  placeholder="e.g. 9876543201"
+                  className="rounded-xl font-mono"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </div>
+
+        {/* Section 4: Financial & Warranty */}
         <div className="bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-xl border border-slate-200 dark:border-zinc-700">
           <div className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
-            3. Financial, Warranty & Funding
+            4. Financial, Warranty & Funding
           </div>
           <Row gutter={12}>
             <Col xs={24} md={8}>
@@ -316,11 +371,11 @@ export const EquipmentEditModal: React.FC<EquipmentEditModalProps> = ({
           </Row>
         </div>
 
-        {/* Section 4: Photo Gallery */}
+        {/* Section 5: Photo Gallery */}
         <div className="bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-xl border border-slate-200 dark:border-zinc-700 space-y-3">
           <div className="flex justify-between items-center">
             <div className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider">
-              4. Equipment Photographs (Max 4 Photos - {equipmentPhotos.length}/4)
+              5. Equipment Photographs (Max 4 Photos - {equipmentPhotos.length}/4)
             </div>
             <Upload
               beforeUpload={file => onAddPhoto(file)}
@@ -366,12 +421,12 @@ export const EquipmentEditModal: React.FC<EquipmentEditModalProps> = ({
           </div>
         </div>
 
-        {/* Section 5: Documents Checklist Manager */}
+        {/* Section 6: Documents Checklist Manager */}
         <div className="bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-xl border border-slate-200 dark:border-zinc-700 space-y-3">
           <div className="flex justify-between items-center">
             <div>
               <div className="text-xs font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider">
-                5. Equipment Documents Checklist
+                6. Equipment Documents Checklist
               </div>
               <div className="text-[11px] text-slate-500">
                 Attach SOPs, manuals, calibration certificates saved directly into uploads directory.

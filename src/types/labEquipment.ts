@@ -35,6 +35,9 @@ export interface Equipment {
   make?: string;
   model?: string;
   serialNo?: string;
+  contactPersonName?: string;
+  contactPersonEmail?: string;
+  contactPersonMobile?: string;
   fundingAgencyType?: string;
   fundingAgencyDetails?: string;
   description?: string;
@@ -64,6 +67,9 @@ export interface PublicEquipment {
   currentLocation?: string;
   make?: string;
   model?: string;
+  contactPersonName?: string;
+  contactPersonEmail?: string;
+  contactPersonMobile?: string;
   category: string;
   departmentName?: string;
   facilityName?: string;

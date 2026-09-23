@@ -424,6 +424,9 @@ export function CentralLabEquipmentPortal() {
 
       equipmentForm.setFieldsValue({
         ...record,
+        contactPersonName: record.contactPersonName || '',
+        contactPersonEmail: record.contactPersonEmail || '',
+        contactPersonMobile: record.contactPersonMobile || '',
         locationSelect,
         locationOther,
         categorySelect,
@@ -444,6 +447,9 @@ export function CentralLabEquipmentPortal() {
       setEquipmentDocs([]);
       equipmentForm.resetFields();
       equipmentForm.setFieldsValue({
+        contactPersonName: '',
+        contactPersonEmail: '',
+        contactPersonMobile: '',
         locationSelect: 'Central Laboratory',
         locationOther: '',
         categorySelect: 'Research Infrastructure',
@@ -502,6 +508,9 @@ export function CentralLabEquipmentPortal() {
         make: values.make?.trim() || '',
         model: values.model?.trim() || '',
         serialNo: values.serialNo?.trim() || '',
+        contactPersonName: values.contactPersonName?.trim() || '',
+        contactPersonEmail: values.contactPersonEmail?.trim() || '',
+        contactPersonMobile: values.contactPersonMobile?.trim() || '',
         departmentName: values.departmentName?.trim() || 'Central Instrumentation Facility (CIF)',
         facilityName: values.facilityName?.trim() || '',
         yearOfPurchase: values.yearOfPurchase ? String(values.yearOfPurchase).trim() : String(new Date().getFullYear()),

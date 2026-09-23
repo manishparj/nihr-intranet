@@ -18,7 +18,10 @@ import {
   DeleteOutlined,
   EyeOutlined,
   ExperimentOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  UserOutlined,
+  MailOutlined,
+  PhoneOutlined
 } from '@ant-design/icons';
 import { Equipment } from '../../types/labEquipment';
 import { CATEGORIES, renderOperationalStatusBadge } from './constants';
@@ -115,7 +118,11 @@ export const AdminEquipmentTab: React.FC<AdminEquipmentTabProps> = ({
       (eq.approvedAbbreviation && eq.approvedAbbreviation.toLowerCase().includes(q)) ||
       (eq.make && eq.make.toLowerCase().includes(q)) ||
       (eq.model && eq.model.toLowerCase().includes(q)) ||
-      (eq.location && eq.location.toLowerCase().includes(q));
+      (eq.location && eq.location.toLowerCase().includes(q)) ||
+      (eq.departmentName && eq.departmentName.toLowerCase().includes(q)) ||
+      (eq.contactPersonName && eq.contactPersonName.toLowerCase().includes(q)) ||
+      (eq.contactPersonEmail && eq.contactPersonEmail.toLowerCase().includes(q)) ||
+      (eq.contactPersonMobile && eq.contactPersonMobile.toLowerCase().includes(q));
 
     const matchCategory = currentCategory === 'all' || eq.category === currentCategory;
     const matchStatus = currentStatus === 'all' || eq.operationalStatus === currentStatus;
@@ -269,6 +276,33 @@ export const AdminEquipmentTab: React.FC<AdminEquipmentTabProps> = ({
                   <div className="text-slate-500">{eq.departmentName || '-'}</div>
                 </div>
               )
+            },
+             {
+              title: 'Contact Person',
+              key: 'contact',
+              render: (_, eq) =>
+                eq.contactPersonName || eq.contactPersonEmail || eq.contactPersonMobile ? (
+                  <div className="text-xs space-y-0.5">
+                    <div className="font-semibold text-slate-800 dark:text-zinc-200 flex items-center gap-1">
+                      <UserOutlined className="text-blue-600 text-[10px]" />
+                      <span>{eq.contactPersonName || '-'}</span>
+                    </div>
+                    {eq.contactPersonEmail && (
+                      <div className="text-[11px] text-blue-600 truncate max-w-[180px] flex items-center gap-1">
+                        <MailOutlined className="text-[10px]" />
+                        <span className="truncate">{eq.contactPersonEmail}</span>
+                      </div>
+                    )}
+                    {eq.contactPersonMobile && (
+                      <div className="text-[11px] text-slate-600 dark:text-zinc-400 font-mono flex items-center gap-1">
+                        <PhoneOutlined className="text-emerald-600 text-[10px]" />
+                        <span>{eq.contactPersonMobile}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-slate-400 text-xs">-</span>
+                )
             },
             {
               title: 'Operational Status',

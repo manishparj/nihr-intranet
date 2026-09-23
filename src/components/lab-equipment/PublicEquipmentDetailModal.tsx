@@ -4,7 +4,10 @@ import {
   ExperimentOutlined,
   CalendarOutlined,
   FilePdfOutlined,
-  DownloadOutlined
+  DownloadOutlined,
+   UserOutlined,
+  MailOutlined,
+  PhoneOutlined
 } from '@ant-design/icons';
 import { Equipment, PublicEquipment } from '../../types/labEquipment';
 import { renderOperationalStatusBadge } from './constants';
@@ -112,6 +115,25 @@ export const PublicEquipmentDetailModal: React.FC<PublicEquipmentDetailModalProp
           </Descriptions.Item>
           <Descriptions.Item label="Purchase Year">{equipment.yearOfPurchase || '-'}</Descriptions.Item>
           <Descriptions.Item label="PRISM Category">{equipment.prismServiceCategory || '-'}</Descriptions.Item>
+          {equipment.contactPersonName && (
+            <Descriptions.Item label="Contact Person">
+              <span className="font-semibold text-slate-900 dark:text-zinc-100">{equipment.contactPersonName}</span>
+            </Descriptions.Item>
+          )}
+          {equipment.contactPersonEmail && (
+            <Descriptions.Item label="Contact Email">
+              <a href={`mailto:${equipment.contactPersonEmail}`} className="text-blue-600 hover:underline">
+                {equipment.contactPersonEmail}
+              </a>
+            </Descriptions.Item>
+          )}
+          {equipment.contactPersonMobile && (
+            <Descriptions.Item label="Contact Mobile">
+              <a href={`tel:${equipment.contactPersonMobile}`} className="text-blue-600 hover:underline font-mono">
+                {equipment.contactPersonMobile}
+              </a>
+            </Descriptions.Item>
+          )}
 
           {/* Admin Only Fields */}
           {'basicCost' in equipment && (equipment as Equipment).basicCost && (
@@ -135,6 +157,51 @@ export const PublicEquipmentDetailModal: React.FC<PublicEquipmentDetailModalProp
             </Descriptions.Item>
           )}
         </Descriptions>
+
+         {/* Contact Person Details */}
+        {(equipment.contactPersonName || equipment.contactPersonEmail || equipment.contactPersonMobile) && (
+          <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-50/90 to-indigo-50/70 dark:from-blue-950/30 dark:to-indigo-950/20 border border-blue-200 dark:border-blue-900/50 shadow-2xs">
+            <div className="text-xs font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <UserOutlined className="text-blue-600" />
+                Equipment In-Charge / Contact Person
+              </span>
+              <span className="text-[10px] font-normal text-slate-500 dark:text-zinc-400">Public Inquiry Contact</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              {equipment.contactPersonName && (
+                <div>
+                  <div className="text-slate-500 dark:text-zinc-400 text-[11px]">Name:</div>
+                  <div className="font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-1.5 mt-0.5">
+                    <UserOutlined className="text-blue-600" /> {equipment.contactPersonName}
+                  </div>
+                </div>
+              )}
+              {equipment.contactPersonEmail && (
+                <div>
+                  <div className="text-slate-500 dark:text-zinc-400 text-[11px]">Email ID:</div>
+                  <a
+                    href={`mailto:${equipment.contactPersonEmail}`}
+                    className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:underline flex items-center gap-1.5 mt-0.5 truncate"
+                  >
+                    <MailOutlined className="text-blue-600" /> {equipment.contactPersonEmail}
+                  </a>
+                </div>
+              )}
+              {equipment.contactPersonMobile && (
+                <div>
+                  <div className="text-slate-500 dark:text-zinc-400 text-[11px]">Mobile Number:</div>
+                  <a
+                    href={`tel:${equipment.contactPersonMobile}`}
+                    className="font-semibold text-slate-900 dark:text-zinc-100 hover:text-blue-600 flex items-center gap-1.5 mt-0.5 font-mono"
+                  >
+                    <PhoneOutlined className="text-emerald-600" /> {equipment.contactPersonMobile}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {equipment.description && (
           <div>

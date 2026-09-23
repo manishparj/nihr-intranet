@@ -41,6 +41,9 @@ export interface Equipment {
   make?: string; // Manufacturer
   model?: string;
   serialNo?: string;
+  contactPersonName?: string; // Equipment In-Charge / Contact Person Name
+  contactPersonEmail?: string; // Contact Person Email ID
+  contactPersonMobile?: string; // Contact Person Mobile Number
   fundingAgencyType?: string;
   fundingAgencyDetails?: string;
   description?: string;
